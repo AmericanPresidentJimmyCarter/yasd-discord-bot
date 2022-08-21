@@ -2,7 +2,7 @@
 
 ## Installation
 
-This installation is intended for debian or arch flavored linux users. YMMV.
+This installation is intended for debian or arch flavored linux users. YMMV. You will need to have Python 3 and pip installed.
 
 Clone my SD fork of [dalle-flow](https://github.com/AmericanPresidentJimmyCarter/dalle-flow/tree/stable-diffusion) and checkout the right branch with the following commands:
 
@@ -15,10 +15,10 @@ Then follow the instructions in the above [link](https://github.com/AmericanPres
 
 At this time, if you haven't already, you will need to put the stable diffusion weights into `stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt`.
 
-To start jina when you're all done:
+To start jina with old models disabled when you're all done:
 
 ```bash
-python flow_parser.py 
+python flow_parser.py --disable-dalle-mega --disable-glid3xl
 jina flow --uses flow.tmp.yml
 ```
 
