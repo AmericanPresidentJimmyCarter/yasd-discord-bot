@@ -57,6 +57,10 @@ OPTIONAL: If you aren't running jina on the same box, you will need change the a
 - Generate images from images (and optionally prompts)
 - Diffuse ("riff") on images it has previously generated
 
+## What do I need?
+
+An NVIDIA GPU with >= 16 GB of VRAM unless you turn down the Stable Diffusion resolution.
+
 ## Something is broken
 
 Open an issue here.
