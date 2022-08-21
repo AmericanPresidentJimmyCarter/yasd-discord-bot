@@ -29,6 +29,9 @@ Somewhere else, clone this repository and follow these steps:
 ```bash
 git clone https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/
 cd yasd-discord-bot
+mkdir image_docarrays
+mkdir images
+mkdir temp_json
 python3 -m virtualenv env
 source env/bin/activate
 pip install -r requirements.txt
