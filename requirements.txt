@@ -1,0 +1,7 @@
+PyNaCl
+discord.py
+Pillow
+aiohttp
+docarray
+jina
+shortid
