@@ -17,7 +17,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('token', help='Discord token')
 args = parser.parse_args()
 
-bot = commands.Bot(command_prefix='>', description="This is a Helper Bot")
+intents = discord.Intents(messages=True)
+bot = commands.Bot(command_prefix='>', description="This is a Helper Bot", intents=intents)
 
 currently_fetching_ai_image: Union[str, bool] = False
 short_id_generator = ShortId()

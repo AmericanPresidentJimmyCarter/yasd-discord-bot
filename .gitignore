@@ -1,1 +1,4 @@
 env
+image_docarrays/*
+images/*
+temp_json/*
