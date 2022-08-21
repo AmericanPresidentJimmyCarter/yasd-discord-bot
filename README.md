@@ -49,6 +49,14 @@ The bot uses the folders as a bus to store/shuttle data. All images created are 
 
 OPTIONAL: If you aren't running jina on the same box, you will need change the address to connect to declared as constant `JINA_SERVER_URL` in `imagetool.py`.
 
+## What can it do?
+
+- Generate images from text
+- Generate images from text with a frozen seed and variations in array format
+- Generate images from text while exploring seeds
+- Generate images from images (and optionally prompts)
+- Diffuse ("riff") on images it has previously generated
+
 ## Something is broken
 
 Open an issue here.
