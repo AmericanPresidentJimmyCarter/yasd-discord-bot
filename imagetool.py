@@ -162,6 +162,8 @@ with open('temp_json/request.json', 'r') as request_json:
                 da = DocumentArray([_d])
 
             params = {'num_images': 4}
+            if request.get('latentless', None) is not None:
+                params['latentless'] = request['latentless']
             if request.get('prompt', None) is not None:
                 params['prompt'] = request['prompt']
             if request.get('scale', None) is not None:

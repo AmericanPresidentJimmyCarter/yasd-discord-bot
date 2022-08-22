@@ -154,6 +154,7 @@ async def riff(ctx, docarray_id: str, idx: int, *, text=''):
         return
 
     iterations = None
+    latentless = False
     prompt = None
     scale = None
     seed = None
@@ -175,6 +176,8 @@ async def riff(ctx, docarray_id: str, idx: int, *, text=''):
                     iterations = iterations_int
             except Exception:
                 pass
+        if 'latentless' in opts:
+            latentless = True
         if 'scale' in opts:
             try:
                 scale_float = float(opts['scale'])
@@ -205,6 +208,7 @@ async def riff(ctx, docarray_id: str, idx: int, *, text=''):
             'docarray_id': docarray_id,
             'index': idx,
             'type': 'riff',
+            'latentless': latentless,
             'prompt': prompt,
             'scale': scale,
             'seed': seed,
@@ -261,6 +265,7 @@ async def image2image(ctx, *, prompt):
         image.save(filename, format='PNG')
 
     iterations = None
+    latentless = False
     scale = None
     seed = None
     strength = None
@@ -283,6 +288,8 @@ async def image2image(ctx, *, prompt):
                         iterations = iterations_int
                 except Exception:
                     pass
+            if 'latentless' in opts:
+                latentless = True
             if 'scale' in opts:
                 try:
                     scale_float = float(opts['scale'])
@@ -314,6 +321,7 @@ async def image2image(ctx, *, prompt):
             'from_discord': True,
             'filename': filename,
             'type': 'riff',
+            'latentless': latentless,
             'prompt': prompt,
             'scale': scale,
             'seed': seed,
