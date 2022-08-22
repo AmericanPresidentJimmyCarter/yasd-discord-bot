@@ -142,6 +142,7 @@ async def image(ctx, *, prompt):
     description='Create an image from a generated image using its ID and an index\n\n' +
         'Accepts the following options in (foo=bar) format: \n' +
         'iterations: number of diffusion iterations (1-16)\n' +
+        'latentless: do not compute latent embeddings from original image\n' +
         'prompt: Alter the prompt given to the image (if not specified, original is used)\n' +
         'scale: conditioning scale for prompt (1.0-50.0)\n' +
         'seed: conditioning scale for prompt (1 to 2^32-1)\n' +
@@ -245,6 +246,7 @@ async def riff(ctx, docarray_id: str, idx: int, *, text=''):
     description='Create an image from an uploaded image\n\n' +
         'Accepts the following options in (foo=bar) format: \n' +
         'iterations: number of diffusion iterations (1-16)\n' +
+        'latentless: do not compute latent embeddings from original image\n' +
         'scale: conditioning scale for prompt (1.0-50.0)\n' +
         'seed: conditioning scale for prompt (1 to 2^32-1)\n' +
         'strength: strength of conditioning (0 < strength < 1)\n'
