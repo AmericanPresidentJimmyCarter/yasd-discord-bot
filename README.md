@@ -61,15 +61,11 @@ OPTIONAL: If you aren't running jina on the same box, you will need change the a
 
 Examples:
 
-```
->image A United States twenty dollar bill with [Jerry Seinfeld, Jason Alexander, Michael Richards, Julia Louis-Dreyfus]'s portrait in the center (seed=2)
-```
+> ``` >image A United States twenty dollar bill with [Jerry Seinfeld, Jason Alexander, Michael Richards, Julia Louis-Dreyfus]'s portrait in the center (seed=2)```
 
 ![Seinfeld actors on money](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/blob/master/examples/seinfeld_money.jpg?raw=true)
 
-```
->image2image Still from Walt Disney's The Princess and the Frog, 2001 (iterations=4, strength=0.6, scale=15)
-```
+> ```>image2image Still from Walt Disney's The Princess and the Frog, 2001 (iterations=4, strength=0.6, scale=15)```
 
 Attached image
 
