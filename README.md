@@ -15,6 +15,8 @@ Then follow the instructions in the above [link](https://github.com/AmericanPres
 
 At this time, if you haven't already, you will need to put the stable diffusion weights into `stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt`.
 
+Need to download the weights? Go to [Huggingface's repository for the latest version](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/blob/main/sd-v1-4.ckpt), log in, agree to the terms and conditions, then download `sd-v1-4.ckpt`. Rename that to `model.ckpt` and put it into the location specified above.
+
 To start jina with old models disabled when you're all done:
 
 ```bash
@@ -56,6 +58,27 @@ OPTIONAL: If you aren't running jina on the same box, you will need change the a
 - Generate images from text while exploring seeds
 - Generate images from images (and optionally prompts)
 - Diffuse ("riff") on images it has previously generated
+
+Examples:
+
+```
+>image A United States twenty dollar bill with [Jerry Seinfeld, Jason Alexander, Michael Richards, Julia Louis-Dreyfus]'s portrait in the center (seed=2)
+```
+
+![Seinfeld actors on money](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/blob/master/examples/seinfeld_money.jpg?raw=true)
+
+```
+>image2image Still from Walt Disney's The Princess and the Frog, 2001 (iterations=4, strength=0.6, scale=15)
+```
+
+Attached image
+
+![Vermeer's Girl with a Pearl Earring](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/blob/master/examples/pearl.jpg?raw=true)
+
+Output image
+
+![Vermeer's Girl with a Pearl Earring diffused into Disney's Princess and the Front](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/blob/master/examples/princess_frog.jpg?raw=true)
+
 
 ## What do I need?
 
