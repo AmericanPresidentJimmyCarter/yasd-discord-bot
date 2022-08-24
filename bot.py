@@ -36,10 +36,10 @@ MAX_STEPS = 250
         'Images may be given variations with an array format by ' +
         'enclosing values in square brackets e.g. "a [red, blue] ball"\n\n' +
         'Accepts the following options in (foo=bar) format: \n' +
-        'sampler: which sampling algorithm to use (k_lms or ddim, default k_lms)\n' +
+        'sampler: which sampling algorithm to use (k_lms, ddim, dpm2, dpm2_ancestral, heun, euler, or euler_ancestral. default k_lms)\n' +
         'scale: conditioning scale for prompt (1.0 to 50.0)\n' +
         'seed: conditioning scale for prompt (1 to 2^32-1)\n' +
-        'seed_search: seed searching mode, enumerates 4 different seeds starting at given seed\n' +
+        'seed_search: seed searching mode, enumerates 9 different seeds starting at given seed\n' +
         'steps: number of steps to perform (50 to 250)\n'
 )
 async def image(ctx, *, prompt):
@@ -149,7 +149,7 @@ async def image(ctx, *, prompt):
         'iterations: number of diffusion iterations (1 to 16)\n' +
         'latentless: do not compute latent embeddings from original image\n' +
         'prompt: Alter the prompt given to the image (if not specified, original is used)\n' +
-        'sampler: which sampling algorithm to use (k_lms or ddim, default k_lms)\n' +
+        'sampler: which sampling algorithm to use (k_lms, ddim, dpm2, dpm2_ancestral, heun, euler, or euler_ancestral. default k_lms)\n' +
         'scale: conditioning scale for prompt (1.0 to 50.0)\n' +
         'seed: conditioning scale for prompt (1 to 2^32-1)\n' +
         'strength: strength of conditioning (0 < strength < 1)\n'
@@ -257,7 +257,7 @@ async def riff(ctx, docarray_id: str, idx: int, *, text=''):
         'Accepts the following options in (foo=bar) format: \n' +
         'iterations: number of diffusion iterations (1 to 16)\n' +
         'latentless: do not compute latent embeddings from original image\n' +
-        'sampler: which sampling algorithm to use (k_lms or ddim, default k_lms)\n' +
+        'sampler: which sampling algorithm to use (k_lms, ddim, dpm2, dpm2_ancestral, heun, euler, or euler_ancestral. default k_lms)\n' +
         'scale: conditioning scale for prompt (1.0 to 50.0)\n' +
         'seed: conditioning scale for prompt (1 to 2^32-1)\n' +
         'strength: strength of conditioning (0 < strength < 1)\n'

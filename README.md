@@ -2,7 +2,7 @@
 
 ## Changelog
 
-- 2022-08-24: Added k_lms sampler, which is now the default. DDIM is still electable with "(sampler=ddim)" argument.
+- 2022-08-24: Added k_lms and other k-diffusion samplers, with k-lms now the default. DDIM is still electable with "(sampler=ddim)" argument.
 
 ## Installation
 
