@@ -26,7 +26,7 @@ Need to download the weights? Go to [Huggingface's repository for the latest ver
 To start jina with old models disabled when you're all done:
 
 ```bash
-python flow_parser.py --disable-dalle-mega --disable-glid3xl
+python flow_parser.py --enable-stable-diffusion --disable-dalle-mega --disable-glid3xl
 jina flow --uses flow.tmp.yml
 ```
 
