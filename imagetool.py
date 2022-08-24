@@ -36,6 +36,8 @@ with open('temp_json/request.json', 'r') as request_json:
         if request['type'] == 'prompt':
             prompt = request['prompt']
             params = {'num_images': 4}
+            if request.get('sampler', None) is not None:
+                params['sampler'] = request['sampler']
             if request.get('scale', None) is not None:
                 params['scale'] = request['scale']
             if request.get('seed', None) is not None:
@@ -74,6 +76,8 @@ with open('temp_json/request.json', 'r') as request_json:
             ]
 
             params = {'num_images': 1}
+            if request.get('sampler', None) is not None:
+                params['sampler'] = request['sampler']
             if request.get('scale', None) is not None:
                 params['scale'] = request['scale']
             if request.get('seed', None) is not None:
@@ -100,11 +104,13 @@ with open('temp_json/request.json', 'r') as request_json:
             output['docarray_loc'] = docarray_loc
             output['id'] = short_id
 
-        # Prompt
+        # Prompt search
         if request['type'] == 'promptsearch':
             prompt = request['prompt']
 
             params = {'num_images': 1}
+            if request.get('sampler', None) is not None:
+                params['sampler'] = request['sampler']
             if request.get('scale', None) is not None:
                 params['scale'] = request['scale']
             if request.get('seed', None) is not None:
@@ -150,7 +156,7 @@ with open('temp_json/request.json', 'r') as request_json:
                 )
                 da = DocumentArray([da[idx]])
             else:
-                prompt = request.get('prompt', '')
+                prompt = request.get('prompt', None)
                 img = Image.open(request['filename'])
                 buffered = BytesIO()
                 img.save(buffered, format='PNG')
@@ -166,6 +172,8 @@ with open('temp_json/request.json', 'r') as request_json:
                 params['latentless'] = request['latentless']
             if request.get('prompt', None) is not None:
                 params['prompt'] = request['prompt']
+            if request.get('sampler', None) is not None:
+                params['sampler'] = request['sampler']
             if request.get('scale', None) is not None:
                 params['scale'] = request['scale']
             if request.get('seed', None) is not None:

@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('token', help='Discord token')
 args = parser.parse_args()
 
-intents = discord.Intents(messages=True)
+intents = discord.Intents(messages=True, message_content=True)
 bot = commands.Bot(command_prefix='>', description="This is a Helper Bot", intents=intents)
 
 currently_fetching_ai_image: Union[str, bool] = False
@@ -33,15 +33,19 @@ MAX_STEPS = 250
 
 @bot.command(
     description='Create an image from a prompt\n\n' +
-        'Images may be given variations with an array format by ' + 
+        'Images may be given variations with an array format by ' +
         'enclosing values in square brackets e.g. "a [red, blue] ball"\n\n' +
         'Accepts the following options in (foo=bar) format: \n' +
-        'scale: conditioning scale for prompt (1.0-50.0)\n' +
+        'sampler: which sampling algorithm to use (k_lms or ddim, default k_lms)\n' +
+        'scale: conditioning scale for prompt (1.0 to 50.0)\n' +
         'seed: conditioning scale for prompt (1 to 2^32-1)\n' +
         'seed_search: seed searching mode, enumerates 4 different seeds starting at given seed\n' +
         'steps: number of steps to perform (50 to 250)\n'
 )
 async def image(ctx, *, prompt):
+    global currently_fetching_ai_image
+
+    sampler = None
     scale = None
     seed = None
     seed_search = False
@@ -57,11 +61,12 @@ async def image(ctx, *, prompt):
                     for val in text[1:-1].split(',') }
             except IndexError:
                 pass
-
+            if 'sampler' in opts:
+                sampler = opts['sampler']
             if 'scale' in opts:
                 try:
                     scale_float = float(opts['scale'])
-                    if scale_float > 0. and scale_float < 50.:
+                    if scale_float >= 0. and scale_float <= 50.:
                         scale = scale_float
                 except Exception:
                     pass
@@ -89,7 +94,6 @@ async def image(ctx, *, prompt):
     if seed_search:
         typ = 'promptsearch'
 
-    global currently_fetching_ai_image
     if currently_fetching_ai_image is not False:
         await ctx.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image}". Please be patient until I finish that.')
         return
@@ -99,9 +103,10 @@ async def image(ctx, *, prompt):
         # Make the request in the filesystem pipeline
         req = {
             'prompt': prompt,
-            'steps': steps,
-            'seed': seed,
+            'sampler': sampler,
             'scale': scale,
+            'seed': seed,
+            'steps': steps,
             'type': typ,
         }
         with open(JSON_IMAGE_TOOL_INPUT_FILE, 'w') as inp:
@@ -141,22 +146,21 @@ async def image(ctx, *, prompt):
 @bot.command(
     description='Create an image from a generated image using its ID and an index\n\n' +
         'Accepts the following options in (foo=bar) format: \n' +
-        'iterations: number of diffusion iterations (1-16)\n' +
+        'iterations: number of diffusion iterations (1 to 16)\n' +
         'latentless: do not compute latent embeddings from original image\n' +
         'prompt: Alter the prompt given to the image (if not specified, original is used)\n' +
-        'scale: conditioning scale for prompt (1.0-50.0)\n' +
+        'sampler: which sampling algorithm to use (k_lms or ddim, default k_lms)\n' +
+        'scale: conditioning scale for prompt (1.0 to 50.0)\n' +
         'seed: conditioning scale for prompt (1 to 2^32-1)\n' +
         'strength: strength of conditioning (0 < strength < 1)\n'
 )
 async def riff(ctx, docarray_id: str, idx: int, *, text=''):
     global currently_fetching_ai_image
-    if currently_fetching_ai_image is not False:
-        await ctx.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image}". Please be patient until I finish that.')
-        return
 
     iterations = None
     latentless = False
     prompt = None
+    sampler = None
     scale = None
     seed = None
     strength = None
@@ -179,10 +183,12 @@ async def riff(ctx, docarray_id: str, idx: int, *, text=''):
                 pass
         if 'latentless' in opts:
             latentless = True
+        if 'sampler' in opts:
+            sampler = opts['sampler']
         if 'scale' in opts:
             try:
                 scale_float = float(opts['scale'])
-                if scale_float > 0. and scale_float < 50.:
+                if scale_float >= 0. and scale_float <= 50.:
                     scale = scale_float
             except Exception:
                 pass
@@ -201,6 +207,9 @@ async def riff(ctx, docarray_id: str, idx: int, *, text=''):
             except Exception:
                 pass
 
+    if currently_fetching_ai_image is not False:
+        await ctx.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image}". Please be patient until I finish that.')
+        return
     currently_fetching_ai_image = f'riffs on previous work `{docarray_id}`, index {str(idx)}'
     await ctx.send(f'Now beginning work on "riff `{docarray_id}` index {str(idx)}". Please be patient until I finish that.')
     try:
@@ -208,13 +217,14 @@ async def riff(ctx, docarray_id: str, idx: int, *, text=''):
         req = {
             'docarray_id': docarray_id,
             'index': idx,
-            'type': 'riff',
+            'iterations': iterations,
             'latentless': latentless,
             'prompt': prompt,
+            'sampler': sampler,
             'scale': scale,
             'seed': seed,
             'strength': strength,
-            'iterations': iterations,
+            'type': 'riff',
         }
         with open(JSON_IMAGE_TOOL_INPUT_FILE, 'w') as inp:
             inp.write(json.dumps(req))
@@ -245,17 +255,15 @@ async def riff(ctx, docarray_id: str, idx: int, *, text=''):
 @bot.command(
     description='Create an image from an uploaded image\n\n' +
         'Accepts the following options in (foo=bar) format: \n' +
-        'iterations: number of diffusion iterations (1-16)\n' +
+        'iterations: number of diffusion iterations (1 to 16)\n' +
         'latentless: do not compute latent embeddings from original image\n' +
-        'scale: conditioning scale for prompt (1.0-50.0)\n' +
+        'sampler: which sampling algorithm to use (k_lms or ddim, default k_lms)\n' +
+        'scale: conditioning scale for prompt (1.0 to 50.0)\n' +
         'seed: conditioning scale for prompt (1 to 2^32-1)\n' +
         'strength: strength of conditioning (0 < strength < 1)\n'
 )
 async def image2image(ctx, *, prompt):
     global currently_fetching_ai_image
-    if currently_fetching_ai_image is not False:
-        await ctx.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image}". Please be patient until I finish that.')
-        return
 
     filename = f'images/attachment-{short_id_generator.generate()}.png'
     if len(ctx.message.attachments) != 1:
@@ -268,6 +276,7 @@ async def image2image(ctx, *, prompt):
 
     iterations = None
     latentless = False
+    sampler = None
     scale = None
     seed = None
     strength = None
@@ -292,10 +301,12 @@ async def image2image(ctx, *, prompt):
                     pass
             if 'latentless' in opts:
                 latentless = True
+            if 'sampler' in opts:
+                sampler = opts['sampler']
             if 'scale' in opts:
                 try:
                     scale_float = float(opts['scale'])
-                    if scale_float > 0. and scale_float < 50.:
+                    if scale_float >= 0. and scale_float <= 50.:
                         scale = scale_float
                 except Exception:
                     pass
@@ -315,20 +326,25 @@ async def image2image(ctx, *, prompt):
                     pass
         prompt = prompt[0:parens_idx]
 
+    if currently_fetching_ai_image is not False:
+        await ctx.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image}". Please be patient until I finish that.')
+        return
+
     currently_fetching_ai_image = f'image2image on prompt `{prompt}`'
     await ctx.send(f'Now beginning work on "image2image `{prompt}`". Please be patient until I finish that.')
     try:
         # Make the request in the filesystem pipeline
         req = {
-            'from_discord': True,
             'filename': filename,
-            'type': 'riff',
+            'from_discord': True,
+            'iterations': iterations,
             'latentless': latentless,
             'prompt': prompt,
+            'sampler': sampler,
             'scale': scale,
             'seed': seed,
             'strength': strength,
-            'iterations': iterations,
+            'type': 'riff',
         }
         with open(JSON_IMAGE_TOOL_INPUT_FILE, 'w') as inp:
             inp.write(json.dumps(req))

@@ -1,6 +1,12 @@
 # Yet Another Stable Diffusion Discord Bot
 
+## Changelog
+
+- 2022-08-24: Added k_lms sampler, which is now the default. DDIM is still electable with "(sampler=ddim)" argument.
+
 ## Installation
+
+**Coming soon: docker image!**
 
 This installation is intended for debian or arch flavored linux users. YMMV. You will need to have Python 3 and pip installed.
 
@@ -45,6 +51,8 @@ Then you can start the bot with:
 python bot.py YOUR_DISCORD_BOT_TOKEN
 ```
 
+**Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
+
 Where YOUR_DISCORD_BOT_TOKEN is your [token](https://discordpy.readthedocs.io/en/stable/discord.html). Once the bot is connected, you can read about how to use it with `>help`.
 
 The bot uses the folders as a bus to store/shuttle data. All images created are stored in `images/`.
@@ -53,11 +61,11 @@ OPTIONAL: If you aren't running jina on the same box, you will need change the a
 
 ## What can it do?
 
-- Generate images from text
-- Generate images from text with a frozen seed and variations in array format
-- Generate images from text while exploring seeds
-- Generate images from images (and optionally prompts)
-- Diffuse ("riff") on images it has previously generated
+- Generate images from text (`>image foo bar`)
+- Generate images from text with a frozen seed and variations in array format (`>image [foo, bar]`)
+- Generate images from text while exploring seeds (`>image foo bar (seed_search=t)`)
+- Generate images from images (and optionally prompts) (`>image2image foo bar`)
+- Diffuse ("riff") on images it has previously generated (`riff <id> <idx>`)
 
 Examples:
 
