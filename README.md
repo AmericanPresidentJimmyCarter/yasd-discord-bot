@@ -14,7 +14,6 @@ sudo apt install python3 python3-pip
 sudo pip3 install virtualenv
 ```
 
-Clone [dalle-flow](https://github.com/jina-ai/dalle-flow) and enter the `dalle-flow` folders with the following commands:
 
 ### Docker installation (build docker image yourself)
 
