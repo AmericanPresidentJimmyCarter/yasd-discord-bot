@@ -2,8 +2,15 @@
 
 ## Changelog
 
+- 2022-08-27: Add content advisory
 - 2022-08-26: Stable Diffusion branch merged into upstream `dalle-flow`. Added docker installation instructions.
 - 2022-08-24: Added k_lms and other k-diffusion samplers, with k-lms now the default. DDIM is still electable with "(sampler=ddim)" argument.
+
+
+## Content advisory
+
+This bot does not come equipped with a NSFW filter for content and will make any content out of the box. Please be sure to read and agree with the [license for the weights](https://github.com/CompVis/stable-diffusion/blob/main/LICENSE), as well as the [MIT license](https://en.wikipedia.org/wiki/MIT_License), and abide by all applicable laws and regulations in your respective area.
+
 
 ## Installation
 
@@ -61,9 +68,6 @@ Somewhere else, clone this repository and follow these steps:
 ```bash
 git clone https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/
 cd yasd-discord-bot
-mkdir image_docarrays
-mkdir images
-mkdir temp_json
 python3 -m virtualenv env
 source env/bin/activate
 pip install -r requirements.txt
@@ -105,9 +109,6 @@ Somewhere else, clone this repository and follow these steps:
 ```bash
 git clone https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/
 cd yasd-discord-bot
-mkdir image_docarrays
-mkdir images
-mkdir temp_json
 python3 -m virtualenv env
 source env/bin/activate
 pip install -r requirements.txt

@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+import pathlib
 
 from io import BytesIO
 from typing import Union
@@ -29,6 +30,11 @@ MAX_ITERATIONS = 16
 MAX_SEED = 2 ** 32 - 1
 MIN_STEPS = 50
 MAX_STEPS = 250
+
+
+pathlib.Path('./image_docarrays').mkdir(parents=True, exist_ok=True)
+pathlib.Path('./images').mkdir(parents=True, exist_ok=True)
+pathlib.Path('./temp_json').mkdir(parents=True, exist_ok=True)
 
 
 @bot.command(
