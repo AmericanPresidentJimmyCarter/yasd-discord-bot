@@ -2,7 +2,8 @@
 
 ## Changelog
 
-- 2022-08-27: Add content advisory
+- 2022-08-28: Add ability to use with low VRAM cards through optimized `dalle-flow` branch `optimized-sd`.
+- 2022-08-27: Add content advisory.
 - 2022-08-26: Stable Diffusion branch merged into upstream `dalle-flow`. Added docker installation instructions.
 - 2022-08-24: Added k_lms and other k-diffusion samplers, with k-lms now the default. DDIM is still electable with "(sampler=ddim)" argument.
 
@@ -10,6 +11,17 @@
 ## Content advisory
 
 This bot does not come equipped with a NSFW filter for content and will make any content out of the box. Please be sure to read and agree with the [license for the weights](https://github.com/CompVis/stable-diffusion/blob/main/LICENSE), as well as the [MIT license](https://en.wikipedia.org/wiki/MIT_License), and abide by all applicable laws and regulations in your respective area.
+
+
+## What do I need?
+
+An NVIDIA GPU with >= 16 GB of VRAM (docker or native installation)
+
+OR
+
+An NVIDIA GPU with >= 5 GB of VRAM using the `dalle-flow` `optimized-sd` branch (no docker option, follow [Native installation](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot#native-installation) below carefully)
+
+If running with a low VRAM GPU, you will not have access to the `>upscale` endpoint and will not have the ability to use multiple samplers. Pay close attention to all steps labeled **LOW VRAM GPU USERS** in the installation instructions.
 
 
 ## Installation
@@ -91,6 +103,23 @@ OPTIONAL: If you aren't running jina on the same box, you will need change the a
 
 Follow the instructions for [dalle-flow](https://github.com/jina-ai/dalle-flow) to install and run that server. The steps you need to follow can be found under "**Run natively**". Once `flow` is up and running, proceed to the next step.
 
+***
+
+**LOW VRAM GPU USERS**
+
+In the instructions for [dalle-flow](https://github.com/jina-ai/dalle-flow), use the following instead of the **Clone repos** step:
+
+```bash
+mkdir dalle && cd dalle
+git clone --single-branch --branch optimized-sd https://github.com/AmericanPresidentJimmyCarter/dalle-flow/
+git clone https://github.com/jina-ai/SwinIR.git
+git clone https://github.com/CompVis/latent-diffusio324n.git
+git clone https://github.com/StableDiffusion/latent-diffusion.git
+git clone https://github.com/jina-ai/glid-3-xl.git
+```
+
+***
+
 At this time, if you haven't already, you will need to put the stable diffusion weights into `dalle/stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt`.
 
 Need to download the weights? Go to [Huggingface's repository for the latest version](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original), log in, agree to the terms and conditions, then download `sd-v1-4.ckpt`. Rename that to `model.ckpt` and put it into the location specified above.
@@ -101,6 +130,21 @@ To start jina with old models disabled when you're all done:
 python flow_parser.py --enable-stable-diffusion --disable-dalle-mega --disable-glid3xl
 jina flow --uses flow.tmp.yml
 ```
+
+***
+
+**LOW VRAM GPU USERS**
+
+Run this instead to disable the SWINIR, which will crash your GPU. the `>upscale` endpoint will not be available.
+
+```bash
+python flow_parser.py --enable-stable-diffusion --disable-dalle-mega --disable-glid3xl --disable-swinir
+jina flow --uses flow.tmp.yml
+```
+
+If you have >= 12 GB of VRAM, you can re-enable SWINIR.
+
+***
 
 Jina should display lots of pretty pictures to tell you it's working. It may take a bit on first boot to load everything.
 
@@ -152,10 +196,6 @@ Output image
 
 ![Vermeer's Girl with a Pearl Earring diffused into Disney's Princess and the Front](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/blob/master/examples/princess_frog.jpg?raw=true)
 
-
-## What do I need?
-
-An NVIDIA GPU with >= 16 GB of VRAM unless you turn down the Stable Diffusion resolution.
 
 ## Something is broken
 
