@@ -112,10 +112,11 @@ In the instructions for [dalle-flow](https://github.com/jina-ai/dalle-flow), use
 ```bash
 mkdir dalle && cd dalle
 git clone --single-branch --branch optimized-sd https://github.com/AmericanPresidentJimmyCarter/dalle-flow/
-git clone https://github.com/jina-ai/SwinIR.git
-git clone https://github.com/CompVis/latent-diffusio324n.git
-git clone https://github.com/StableDiffusion/latent-diffusion.git
-git clone https://github.com/jina-ai/glid-3-xl.git
+git clone https://github.com/jina-ai/SwinIR
+git clone https://github.com/CompVis/stable-diffusion
+git clone https://github.com/CompVis/latent-diffusion
+git clone https://github.com/jina-ai/glid-3-xl
+
 ```
 
 ***
