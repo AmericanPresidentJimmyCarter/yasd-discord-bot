@@ -100,8 +100,6 @@ class FourImageButtons(discord.ui.View):
         button: discord.ui.Button,
         idx: int,
     ):
-        button.disabled = True
-        await interaction.message.edit(view=self)
         await interaction.response.defer()
         await _riff(interaction.channel, interaction.user, self.short_id, idx)
 
