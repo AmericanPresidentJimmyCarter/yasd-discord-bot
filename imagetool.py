@@ -1,3 +1,4 @@
+import argparse
 import json
 import traceback
 
@@ -12,6 +13,14 @@ from PIL import Image
 JINA_SERVER_URL = 'grpc://127.0.0.1:51005'
 
 short_id_generator = ShortId()
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('suffix', help='Input/output file suffix')
+args = parser.parse_args()
+
+FILE_NAME_IN = f'temp_json/request-{args.suffix}.json'
+FILE_NAME_OUT = f'temp_json/output-{args.suffix}.json'
 
 
 def strip_square(s):
@@ -29,7 +38,7 @@ def strip_square(s):
 
 
 output = {}
-with open('temp_json/request.json', 'r') as request_json:
+with open(FILE_NAME_IN, 'r') as request_json:
     request = json.load(request_json)
     try:
         # Prompt
@@ -74,6 +83,8 @@ with open('temp_json/request.json', 'r') as request_json:
                 prompt_stripped[0:arr_idx] + val + prompt_stripped[arr_idx:]
                 for val in prompt_variations
             ]
+            if len(prompts) > 16:
+                prompts = prompts[0:16]
 
             params = {'num_images': 1}
             if request.get('sampler', None) is not None:
@@ -204,6 +215,38 @@ with open('temp_json/request.json', 'r') as request_json:
             output['docarray_loc'] = docarray_loc
             output['id'] = short_id
 
+        # Interpolate
+        if request['type'] == 'interpolate':
+            params = {'num_images': 9}
+            prompt = request['prompt']
+
+            if request.get('sampler', None) is not None:
+                params['sampler'] = request['sampler']
+            if request.get('scale', None) is not None:
+                params['scale'] = request['scale']
+            if request.get('seed', None) is not None:
+                params['seed'] = request['seed']
+            if request.get('strength', None) is not None:
+                params['strength'] = request['strength']
+
+            interpolated_da = Document(text=prompt.strip()).post(
+                f'{JINA_SERVER_URL}/stableinterpolate',
+                parameters=params).matches
+
+            short_id = short_id_generator.generate()
+            image_loc = f'images/{short_id}.png'
+            docarray_loc = f'image_docarrays/{short_id}.bin'
+
+            interpolated_da.plot_image_sprites(output=image_loc, show_index=True,
+                canvas_size=512*3)
+            interpolated_da.save_binary(docarray_loc, protocol='protobuf',
+                compress='lz4')
+
+            output['image_loc'] = image_loc
+            output['docarray_loc'] = docarray_loc
+            output['id'] = short_id
+
+
         # Upscale
         if request['type'] == 'upscale':
             docarray_id = request['docarray_id']
@@ -226,5 +269,5 @@ with open('temp_json/request.json', 'r') as request_json:
         traceback.print_exc()
         output['error'] = str(e)
 
-with open('temp_json/output.json', 'w') as output_file:
+with open(FILE_NAME_OUT, 'w') as output_file:
     output_file.write(json.dumps(output))

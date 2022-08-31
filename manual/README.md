@@ -4,11 +4,22 @@ Welcome to the YASD Discord Bot manual! This will help guide you through the var
 
 ## Commands
 
-Please note that when using a direct image command, extra must be specified in `(foo=bar, zoo=car)` format. For example, to change the sampler and steps in direct message mode, you could prompt `>image a red ball (sampler=euler, steps=10)`.
+This bot supports both legacy direct message commands and slash commands. Legacy direct message commands are all prefixed with `>`, while slash commands are prefixed with `/` and have some auto-completion features that make them easier to use. Please note that when using a direct message command, extra must be specified in `(foo=bar, zoo=car)` format. For example, to change the sampler and steps in direct message mode, you could prompt `>image a red ball (sampler=euler, steps=10)`.
+
+For all commands that use indexes, the indexes are stored from left to right per row. For example, a series of 4 images will be indexed:
+
+```
+|~~~~~|
+| 0 1 |
+| 2 3 |
+|~~~~~|
+```
 
 ### Text-to-image
 - `/image <prompt>` (slash command)
+- `/image <prompt [variation 1, variation 2, ...]>` (slash command)
 - `>image <prompt> (foo=bar)` (direct message command)
+- `>image <prompt [variation 1, variation 2, ...]> (foo=bar)` (direct message command)
 
 Generate an image from a text prompt. Images may be given variations with an array format by enclosing values in square brackets e.g. "a [red, blue, green, purple] ball".
 
@@ -31,10 +42,10 @@ Options: Same as for Riff (Diffusion) below.
 
 Diffuse an image that was generated in the past or which was uploaded to the bot. The `docarray_id` is the short string (e.g. "eoZw11NmT") given with the images, while `index` refers to the index of the images in zeroeth ordering.
 
-Riff buttons that use all the default 
+Riff buttons using the feature with default settings are automatically added to all `riff` or `image` commands.
 
 Options:
-- `iterations`: The number of times to re-diffuse before generating the final four images. The more iterations, the strong the effect.
+- `iterations`: The number of times to re-diffuse before generating the final four images. The more iterations, the strong the effect. Default is `1` or no extra iterations.
 - `latentless`: Use a random latent to generate the image, meaning that the prior image is not used at all. May be used to test a prompt without the image while using the same parameters.
 - `prompt`: Prompt the override the prompt saved in the DocArray.
 - `sampler`: Which sampler to use when creating the image. Some samplers, such as `euler`, may require fewer steps to get good results, while others can have [a dramatic effect](https://i.redd.it/uy2fp799wmj91.jpg) on image generation itself. Defaults to `k_lms`.
@@ -66,6 +77,8 @@ Simply tagging the bot with a message starting with `@bot_name` where `bot_name`
 - `>upscale <docarray_id> <index>` (direct message command)
 
 Upscale an image to 4x the resolution (512x512 -> 1024x1024).
+
+Upscale buttons using the feature are automatically added to all `riff` or `image` commands.
 
 
 ## Administrator-level Configurations

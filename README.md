@@ -1,7 +1,18 @@
 # Yet Another Stable Diffusion Discord Bot
 
+## Features
+
+- **Highly Scalable**: Leverages `dalle-flow` gRPC interface to independently serve images from any number of GPUs, while higher memory calls to the gRPC through the bot are forked onto individual instances of Python.
+- **Support For Other Popular Models**: Latent diffusion GLID3XL or DALLE-MEGA can easily by turned on in addition to Stable Diffusion through `dalle-flow` for text-to-image generation.
+- **Support For Low VRAM GPUS**: Locally maintained branch `optimized-sd` of `dalle-flow` supports image generation with GPUs >= 5 GB.
+- **Supports Slash and Legacy Style Commands**: While Discord is moving towards the new slash style commands that feature auto-completion functions, YASD Discord Bot also features direct commands prefixed with `>` -- whichever you find easier.
+- **Easy User Interface Including Buttons and Loading Indicators**: Riffing and upscaling your creations has never been easier! It even comes with a [manual](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme)!
+- **Stores All Images and Prompts by Default**: Never lose your previous generations!
+
+
 ## Changelog
 
+- 2022-08-30: Updated to add slash commands in addition to legacy commands, added a manual link instead of help, added multi-user support (more than one user may now use the bot at a time without waiting), added `interpolate` command.
 - 2022-08-28: Add ability to use with low VRAM cards through optimized `dalle-flow` branch `optimized-sd`.
 - 2022-08-27: Add content advisory.
 - 2022-08-26: Stable Diffusion branch merged into upstream `dalle-flow`. Added docker installation instructions.
@@ -88,12 +99,12 @@ pip install -r requirements.txt
 Then you can start the bot with:
 
 ```bash
-python bot.py YOUR_DISCORD_BOT_TOKEN
+python bot.py YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
 ```
 
 **Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
 
-Where YOUR_DISCORD_BOT_TOKEN is your [token](https://discordpy.readthedocs.io/en/stable/discord.html). Once the bot is connected, you can read about how to use it with `>help`.
+Where YOUR_DISCORD_BOT_TOKEN is your [token](https://discordpy.readthedocs.io/en/stable/discord.html) and YOUR_GUILD_ID is the integer ID for your server (right click on the server name, then click "Copy ID"). Supplying the guild ID is optional, but it will result in the slash commands being available to your server almost instantly. Once the bot is connected, you can read about how to use it with `>help`.
 
 The bot uses the folders as a bus to store/shuttle data. All images created are stored in `images/`.
 
@@ -145,6 +156,8 @@ jina flow --uses flow.tmp.yml
 
 If you have >= 12 GB of VRAM, you can re-enable SWINIR.
 
+Note that interpolate is currently not working with low VRAM, but will be added shortly.
+
 ***
 
 Jina should display lots of pretty pictures to tell you it's working. It may take a bit on first boot to load everything.
@@ -162,12 +175,12 @@ pip install -r requirements.txt
 Then you can start the bot with:
 
 ```bash
-python bot.py YOUR_DISCORD_BOT_TOKEN
+python bot.py YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
 ```
 
 **Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
 
-Where YOUR_DISCORD_BOT_TOKEN is your [token](https://discordpy.readthedocs.io/en/stable/discord.html). Once the bot is connected, you can read about how to use it with `>help`.
+Where YOUR_DISCORD_BOT_TOKEN is your [token](https://discordpy.readthedocs.io/en/stable/discord.html) and YOUR_GUILD_ID is the integer ID for your server (right click on the server name, then click "Copy ID"). Supplying the guild ID is optional, but it will result in the slash commands being available to your server almost instantly. Once the bot is connected, you can read about how to use it with `>help`.
 
 The bot uses the folders as a bus to store/shuttle data. All images created are stored in `images/`.
 
@@ -198,6 +211,10 @@ Output image
 ![Vermeer's Girl with a Pearl Earring diffused into Disney's Princess and the Front](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/blob/master/examples/princess_frog.jpg?raw=true)
 
 
+> ```>interpolate Sonic the Hedgehog portrait | European Hedgehog Portrait```
+
+![Interpolation of Sonic the Hedgehog portrait to European Hedgehog Portrait](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/blob/master/examples/interpolate.jpg?raw=true)
+
 ## Something is broken
 
 Open an issue here.
@@ -207,5 +224,5 @@ Open an issue here.
 Be cool, stay in school.
 
 ## License
-
+Copyright 2022 Jimmy (AmericanPresidentJimmyCarter)
 [MIT](https://choosealicense.com/licenses/mit/)
