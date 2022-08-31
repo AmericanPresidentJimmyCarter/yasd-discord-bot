@@ -4,4 +4,3 @@ Pillow
 aiohttp
 docarray
 jina
-shortid

@@ -1,19 +1,18 @@
 import argparse
 import json
+import random
+import string
 import traceback
 
 from copy import deepcopy
 from io import BytesIO
 
-from docarray import Document, DocumentArray
-from shortid import ShortId
 from PIL import Image
+from docarray import Document, DocumentArray
 
 # You may need to change this.
 JINA_SERVER_URL = 'grpc://127.0.0.1:51005'
-
-short_id_generator = ShortId()
-
+ID_LENGTH = 12
 
 parser = argparse.ArgumentParser()
 parser.add_argument('suffix', help='Input/output file suffix')
@@ -21,6 +20,11 @@ args = parser.parse_args()
 
 FILE_NAME_IN = f'temp_json/request-{args.suffix}.json'
 FILE_NAME_OUT = f'temp_json/output-{args.suffix}.json'
+
+
+def short_id_generator():
+    return ''.join(random.choices(string.ascii_lowercase +
+        string.ascii_uppercase + string.digits, k=ID_LENGTH))
 
 
 def strip_square(s):
@@ -55,7 +59,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 params['steps'] = request['steps']
             da = Document(text=prompt.strip()).post(JINA_SERVER_URL,
                 parameters=params).matches
-            short_id = short_id_generator.generate()
+            short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
             da.plot_image_sprites(output=image_loc, canvas_size=1024,
@@ -104,7 +108,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                     parameters=params).matches[0])
             da = DocumentArray(docs)
 
-            short_id = short_id_generator.generate()
+            short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
             da.plot_image_sprites(output=image_loc, canvas_size=1024,
@@ -140,7 +144,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 params['seed'] += 1
             da = DocumentArray(docs)
 
-            short_id = short_id_generator.generate()
+            short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
             da.plot_image_sprites(output=image_loc, canvas_size=1024,
@@ -202,7 +206,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
             diffused_da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
                 parameters=params)[0].matches
 
-            short_id = short_id_generator.generate()
+            short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
 
@@ -233,7 +237,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 f'{JINA_SERVER_URL}/stableinterpolate',
                 parameters=params).matches
 
-            short_id = short_id_generator.generate()
+            short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
 
@@ -258,7 +262,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
 
             upscale = da[idx].post(f'{JINA_SERVER_URL}/upscale')
 
-            short_id = short_id_generator.generate()
+            short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
 
             da_upscale = DocumentArray([upscale])

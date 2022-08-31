@@ -2,6 +2,8 @@ import argparse
 import asyncio
 import json
 import pathlib
+import random
+import string
 import time
 
 from docarray import Document, DocumentArray
@@ -13,7 +15,6 @@ import discord
 from PIL import Image
 from discord import app_commands
 from discord.ext import commands
-from shortid import ShortId
 
 
 parser = argparse.ArgumentParser()
@@ -24,9 +25,9 @@ args = parser.parse_args()
 guild = args.guild
 
 currently_fetching_ai_image: dict[str, Union[str, bool]] = {}
-short_id_generator = ShortId()
 
 MANUAL_LINK = 'https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme'
+ID_LENGTH = 12
 JSON_IMAGE_TOOL_INPUT_FILE_FN = lambda uid: f'temp_json/request-{uid}.json'
 JSON_IMAGE_TOOL_OUTPUT_FILE_FN = lambda uid: f'temp_json/output-{uid}.json'
 MIN_ITERATIONS = 1
@@ -40,6 +41,10 @@ MIN_STRENGTH = 0.01
 MIN_STRENGTH_INTERPOLATE = 0.50
 MAX_STRENGTH = 0.99
 NUM_IMAGES_MAX = 9
+
+def short_id_generator():
+    return ''.join(random.choices(string.ascii_lowercase +
+        string.ascii_uppercase + string.digits, k=ID_LENGTH))
 
 SAMPLER_CHOICES = [
     app_commands.Choice(name="k_lms", value="k_lms"),
@@ -702,7 +707,7 @@ async def on_message(message):
     if isinstance(message.clean_content, str) and \
         message.clean_content.startswith('>image2image'):
         prompt = message.clean_content[13:]
-        sid = short_id_generator.generate()
+        sid = short_id_generator()
         image_fn = f'images/{sid}.png'
         da_fn = f'image_docarrays/{sid}.bin'
         if len(message.attachments) != 1:
@@ -873,7 +878,7 @@ async def on_message(message):
         message.mentions[0].id == client.user.id and \
         len(message.attachments) >= 1:
         for i, attachment in enumerate(message.attachments):
-            sid = short_id_generator.generate()
+            sid = short_id_generator()
             image_fn = f'images/{sid}.png'
             da_fn = f'image_docarrays/{sid}.bin'
 
