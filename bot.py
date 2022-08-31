@@ -71,8 +71,9 @@ class YASDClient(discord.Client):
         guild_id = None
         if guild is not None:
             guild_id =  discord.Object(id=guild)
-        self.tree.copy_global_to(guild=guild_id)
-        await self.tree.sync(guild=guild_id)
+        if guild_id is not None:
+            self.tree.copy_global_to(guild=guild_id)
+            await self.tree.sync(guild=guild_id)
 
 
 client = YASDClient()
