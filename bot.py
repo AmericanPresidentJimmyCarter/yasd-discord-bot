@@ -426,7 +426,7 @@ async def _interpolate(
         # Make the request in the filesystem pipeline
         req = {
             'type': 'interpolate',
-            'prompt': f'{prompt1}|f{prompt2}',
+            'prompt': f'{prompt1}|{prompt2}',
             'sampler': sampler,
             'scale': scale,
             'seed': seed,
