@@ -1,5 +1,7 @@
 # Yet Another Stable Diffusion Discord Bot
 
+![Yet Another Stable Diffusion Discord Bot Splash Image](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/blob/master/examples/yasd.jpg?raw=true)
+
 ## Features
 
 - **Highly Scalable**: Leverages `dalle-flow` gRPC interface to independently serve images from any number of GPUs, while higher memory calls to the gRPC through the bot are forked onto individual instances of Python.
