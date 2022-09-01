@@ -1,4 +1,5 @@
 import argparse
+from ast import arg
 import asyncio
 import json
 import pathlib
@@ -21,6 +22,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('token', help='Discord token')
 parser.add_argument('-g', '--guild', help='Discord guild ID', type=int,
     required=False)
+parser.add_argument('--optimized-sd', dest='optimized_sd',
+    action=argparse.BooleanOptionalAction)
 args = parser.parse_args()
 guild = args.guild
 
@@ -46,15 +49,21 @@ def short_id_generator():
     return ''.join(random.choices(string.ascii_lowercase +
         string.ascii_uppercase + string.digits, k=ID_LENGTH))
 
-SAMPLER_CHOICES = [
-    app_commands.Choice(name="k_lms", value="k_lms"),
-    app_commands.Choice(name="ddim", value="ddim"),
-    app_commands.Choice(name="dpm2", value="dpm2"),
-    app_commands.Choice(name="dpm2_ancestral", value="dpm2_ancestral"),
-    app_commands.Choice(name="heun", value="heun"),
-    app_commands.Choice(name="euler", value="euler"),
-    app_commands.Choice(name="euler_ancestral", value="euler_ancestral"),
-]
+print(args, args.optimized_sd)
+if args.optimized_sd:
+    SAMPLER_CHOICES = [
+        app_commands.Choice(name="ddim", value="ddim"),
+    ]
+else:
+    SAMPLER_CHOICES = [
+        app_commands.Choice(name="k_lms", value="k_lms"),
+        app_commands.Choice(name="ddim", value="ddim"),
+        app_commands.Choice(name="dpm2", value="dpm2"),
+        app_commands.Choice(name="dpm2_ancestral", value="dpm2_ancestral"),
+        app_commands.Choice(name="heun", value="heun"),
+        app_commands.Choice(name="euler", value="euler"),
+        app_commands.Choice(name="euler_ancestral", value="euler_ancestral"),
+    ]
 
 pathlib.Path('./image_docarrays').mkdir(parents=True, exist_ok=True)
 pathlib.Path('./images').mkdir(parents=True, exist_ok=True)
@@ -211,7 +220,7 @@ async def _image(
         return
     currently_fetching_ai_image[author_id] = prompt
     work_msg = await channel.send(
-        f'Now beginning work on "{prompt}" for {user.display_name}. Please be patient until I finish that.')
+        f'Now beginning work on "{prompt}" for <@{author_id}>. Please be patient until I finish that.')
     try:
         # Make the request in the filesystem pipeline
         req = {
@@ -241,7 +250,7 @@ async def _image(
         seeds = output.get('seeds', None)
         file = discord.File(image_loc)
         await work_msg.edit(
-            content=f'Image generation for prompt "{prompt}" complete. The ID for your images is `{short_id}`.',
+            content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
             attachments=[file],
             view=FourImageButtons(short_id=short_id))
         if seed_search is True:
@@ -319,7 +328,7 @@ async def _riff(
             delete_after=5)
         return
     currently_fetching_ai_image[author_id] = f'riffs on previous work `{docarray_id}`, index {str(idx)}'
-    work_msg = await channel.send(f'Now beginning work on "riff `{docarray_id}` index {str(idx)}" for {user.display_name}. Please be patient until I finish that.')
+    work_msg = await channel.send(f'Now beginning work on "riff `{docarray_id}` index {str(idx)}" for <@{author_id}>. Please be patient until I finish that.')
     try:
         # Make the request in the filesystem pipeline
         req = {
@@ -353,7 +362,7 @@ async def _riff(
 
         file = discord.File(image_loc)
         await work_msg.edit(
-            content=f'Image generation for riff on `{docarray_id}` index {str(idx)} complete. The ID for your new images is `{short_id}`.',
+            content=f'Image generation for riff on `{docarray_id}` index {str(idx)} for for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
             attachments=[file],
             view=FourImageButtons(short_id=short_id))
     except Exception as e:
@@ -426,7 +435,7 @@ async def _interpolate(
 
     short_id = None
     currently_fetching_ai_image[author_id] = f'interpolate on prompt {prompt1} to {prompt2}'
-    work_msg = await channel.send(f'Now beginning work on "interpolate `{prompt1}` to `{prompt2}`" for {user.display_name}. Please be patient until I finish that.')
+    work_msg = await channel.send(f'Now beginning work on "interpolate `{prompt1}` to `{prompt2}`" for <@{author_id}>. Please be patient until I finish that.')
     try:
         # Make the request in the filesystem pipeline
         req = {
@@ -456,7 +465,7 @@ async def _interpolate(
 
         file = discord.File(image_loc)
         await work_msg.edit(
-            content=f'Image generation for interpolate on `{prompt1}` to `{prompt2}` complete. The ID for your new images is `{short_id}`.',
+            content=f'Image generation for interpolate on `{prompt1}` to `{prompt2}` for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
             attachments=[file])
     except Exception as e:
         await channel.send(f'Got unknown error on interpolate `{prompt1}` to `{prompt2}`: {str(e)}')
@@ -514,7 +523,7 @@ async def _upscale(
         return
 
     currently_fetching_ai_image[author_id] = f'upscale on previous work `{docarray_id}`, index {str(idx)}'
-    work_msg = await channel.send(f'Now beginning work on "upscale `{docarray_id}` index {str(idx)}" for {user.display_name}. Please be patient until I finish that.')
+    work_msg = await channel.send(f'Now beginning work on "upscale `{docarray_id}` index {str(idx)}" for <@{author_id}>. Please be patient until I finish that.')
     try:
         # Make the request in the filesystem pipeline
         req = {
@@ -540,7 +549,7 @@ async def _upscale(
 
         file = discord.File(image_loc)
         await work_msg.edit(
-            content=f'Image generation for upscale on `{docarray_id}` index {str(idx)} complete.',
+            content=f'Image generation for upscale on `{docarray_id}` index {str(idx)} for <@{author_id}> complete.',
             attachments=[file])
     except Exception as e:
         await channel.send(f'Got unknown error on upscale "{docarray_id}" index {str(idx)}: {str(e)}')
@@ -913,8 +922,8 @@ async def on_message(message):
 
             da = DocumentArray([_d])
             da.save_binary(da_fn, protocol='protobuf', compress='lz4')
-            await message.channel.send(f'Attachment {attachment.filename} ({i}) uploaded by ' +
-                f'{message.author.display_name} has been uploaded and given ID `{sid}`.' +
+            await message.channel.send(f'Attachment {attachment.filename} ({i}) sent by ' +
+                f'<@{str(message.author.id)}> has been uploaded and given ID `{sid}`.' +
                 ' To use this ID in a riff or upscale, just use 0 for the image ' +
                 'index.')
             await message.channel.send(sid)

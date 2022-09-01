@@ -92,5 +92,7 @@ If you have installed the Native Installation, you can find a simple configurati
 You can turn on other models in [dalle-flow](https://github.com/jina-ai/dalle-flow) like DALLE-MEGA and GLID3XL by either removing the environmental variables that disable them (Docker) or by removing the flags passed to `flow_parser.py` (Native Installation). Be aware that you'll need a lot of VRAM!
 
 ## License
+
 Copyright 2022 Jimmy (AmericanPresidentJimmyCarter)
+
 [MIT](https://choosealicense.com/licenses/mit/)

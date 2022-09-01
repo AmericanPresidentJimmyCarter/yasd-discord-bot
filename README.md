@@ -11,6 +11,20 @@
 - **Easy User Interface Including Buttons and Loading Indicators**: Riffing and upscaling your creations has never been easier! It even comes with a [manual](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme)!
 - **Stores All Images and Prompts by Default**: Never lose your previous generations!
 
+## Contents
+
+- [Changelog](#changelog)
+- [Content advisory](#content-advisory)
+- [What do I need?](#what-do-i-need)
+- [Installation](#installation)
+  - [Docker](#docker-installation-build-docker-image-yourself)
+  - [Native (Low VRAM)](#native-installation)
+- [What can it do?](#what-can-it-do)
+- [User Manual](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme)
+- [Something is broken](#something-is-broken)
+- [Closing Remarks](#closing-remarks)
+- [License](#license)
+
 
 ## Changelog
 
@@ -158,8 +172,6 @@ jina flow --uses flow.tmp.yml
 
 If you have >= 12 GB of VRAM, you can re-enable SWINIR.
 
-Note that interpolate is currently not working with low VRAM, but will be added shortly.
-
 ***
 
 Jina should display lots of pretty pictures to tell you it's working. It may take a bit on first boot to load everything.
@@ -180,6 +192,8 @@ Then you can start the bot with:
 python bot.py YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
 ```
 
+**LOW VRAM GPU USERS**: You can disable the other samplers showing up, which do nothing, by adding the flag `--optimized-sd` to the above command.
+
 **Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
 
 Where YOUR_DISCORD_BOT_TOKEN is your [token](https://discordpy.readthedocs.io/en/stable/discord.html) and YOUR_GUILD_ID is the integer ID for your server (right click on the server name, then click "Copy ID"). Supplying the guild ID is optional, but it will result in the slash commands being available to your server almost instantly. Once the bot is connected, you can read about how to use it with `>help`.
@@ -190,11 +204,12 @@ OPTIONAL: If you aren't running jina on the same box, you will need change the a
 
 ## What can it do?
 
-- Generate images from text (`>image foo bar`)
-- Generate images from text with a frozen seed and variations in array format (`>image [foo, bar]`)
-- Generate images from text while exploring seeds (`>image foo bar (seed_search=t)`)
+- Generate images from text (`/image foo bar`)
+- Generate images from text with a frozen seed and variations in array format (`/image [foo, bar]`)
+- Generate images from text while exploring seeds (`/image foo bar (seed_search=t)`)
 - Generate images from images (and optionally prompts) (`>image2image foo bar`)
-- Diffuse ("riff") on images it has previously generated (`riff <id> <idx>`)
+- Diffuse ("riff") on images it has previously generated (`/riff <id> <idx>`)
+- Interpolate between two prompts (`/interpolate <prompt 1> <prompt 2>`)
 
 Examples:
 
@@ -226,5 +241,7 @@ Open an issue here.
 Be cool, stay in school.
 
 ## License
+
 Copyright 2022 Jimmy (AmericanPresidentJimmyCarter)
+
 [MIT](https://choosealicense.com/licenses/mit/)
