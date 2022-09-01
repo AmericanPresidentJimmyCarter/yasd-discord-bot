@@ -49,7 +49,7 @@ def short_id_generator():
     return ''.join(random.choices(string.ascii_lowercase +
         string.ascii_uppercase + string.digits, k=ID_LENGTH))
 
-print(args, args.optimized_sd)
+
 if args.optimized_sd:
     SAMPLER_CHOICES = [
         app_commands.Choice(name="ddim", value="ddim"),
@@ -646,8 +646,8 @@ async def on_message(message):
         docarray_id = msg_split[1]
         idx = 0
         try:
-            int(msg_split[2])
-        except Exception:
+            idx = int(msg_split[2])
+        except Exception as e:
             pass
 
         text = ''
@@ -877,7 +877,7 @@ async def on_message(message):
         docarray_id = msg_split[1]
         idx = 0
         try:
-            int(msg_split[2])
+            idx = int(msg_split[2])
         except Exception:
             pass
 
@@ -931,7 +931,6 @@ async def on_message(message):
 
 @client.event
 async def on_ready():
-    await client.change_presence(activity=discord.Activity(name="H4ck t3h G1bs0n"))
     print('Bot is alive')
 
 
