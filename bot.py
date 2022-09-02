@@ -1,5 +1,4 @@
 import argparse
-from ast import arg
 import asyncio
 import json
 import pathlib
@@ -9,13 +8,14 @@ import time
 
 from docarray import Document, DocumentArray
 from io import BytesIO
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import discord
 
 from PIL import Image
 from discord import app_commands
 from discord.ext import commands
+from discord.ui import Button, View
 
 
 parser = argparse.ArgumentParser()
@@ -29,8 +29,12 @@ guild = args.guild
 
 currently_fetching_ai_image: dict[str, Union[str, bool]] = {}
 
+BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY = 'four_img_views'
+button_store_dict: dict[str, list] = { BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY: [] }
+
 MANUAL_LINK = 'https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme'
 ID_LENGTH = 12
+BUTTON_STORE = f'temp_json/button-store-{str(guild)}.json'
 JSON_IMAGE_TOOL_INPUT_FILE_FN = lambda uid: f'temp_json/request-{uid}.json'
 JSON_IMAGE_TOOL_OUTPUT_FILE_FN = lambda uid: f'temp_json/output-{uid}.json'
 MIN_ITERATIONS = 1
@@ -44,6 +48,7 @@ MIN_STRENGTH = 0.01
 MIN_STRENGTH_INTERPOLATE = 0.50
 MAX_STRENGTH = 0.99
 NUM_IMAGES_MAX = 9
+
 
 def short_id_generator():
     return ''.join(random.choices(string.ascii_lowercase +
@@ -68,6 +73,25 @@ else:
 pathlib.Path('./image_docarrays').mkdir(parents=True, exist_ok=True)
 pathlib.Path('./images').mkdir(parents=True, exist_ok=True)
 pathlib.Path('./temp_json').mkdir(parents=True, exist_ok=True)
+
+
+# A simple JSON store for button views that we write to when making new buttons
+# for new calls and which is kept in memory and keeps track of all buttons ever
+# added. This allows us to persist buttons between reboots of the bot, power
+# outages, etc.
+#
+# TODO Clear out old buttons on boot, since we ignore anything more than 48
+# hours old below anyway.
+bs_fn = pathlib.Path(BUTTON_STORE)
+if bs_fn.is_file():
+    with open(bs_fn, 'r') as bs:
+        button_store_dict = json.load(bs)
+
+def write_button_store():
+    global button_store_dict
+    with open(bs_fn, 'w') as bs:
+        json.dump(button_store_dict, bs)
+
 
 intents = discord.Intents(
     messages=True,
@@ -94,10 +118,46 @@ client = YASDClient()
 
 
 class FourImageButtons(discord.ui.View):
+    message_id = None
     short_id = None
-    def __init__(self, *, short_id=None, timeout=180):
+    def __init__(self, *, message_id=None, short_id=None, timeout=None):
         super().__init__(timeout=timeout)
+        self.message_id = message_id
         self.short_id = short_id
+
+    def serialize_to_json_and_store(self):
+        '''
+        Store a serialized representation in the global magic json.
+        '''
+        global button_store_dict
+        as_dict = {
+            'message_id': self.message_id,
+            'short_id': self.short_id,
+            'items': [ {
+                'label': btn.label,
+                'custom_id': btn.custom_id,
+                'row': btn.row,
+            } for btn in self.children ],
+            'time': int(time.time()),
+        }
+        button_store_dict[BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY].append(as_dict)
+        write_button_store()
+
+    @classmethod
+    def from_serialized(cls, serialized):
+        '''
+        Return a view from a serialized representation.
+        '''
+        message_id = serialized['message_id']
+        short_id = serialized['short_id']
+        fib = cls(message_id=message_id, short_id=short_id)
+
+        mapped_to_label = { btn.label: btn for btn in fib.children }
+        for btn_dict in serialized['items']:
+            btn = mapped_to_label[btn_dict['label']]
+            btn.custom_id = btn_dict['custom_id']
+
+        return fib
 
     async def global_shows_in_use(self, interaction: discord.Interaction):
         global currently_fetching_ai_image
@@ -128,7 +188,8 @@ class FourImageButtons(discord.ui.View):
         await _upscale(interaction.channel, interaction.user, self.short_id, idx)
 
 
-    @discord.ui.button(label="Riff 0", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="Riff 0", style=discord.ButtonStyle.blurple, row=0,
+        custom_id=f'{short_id_generator()}-riff-0')
     async def riff_button_0(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
@@ -136,7 +197,8 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_riff(interaction, button, 0)
 
-    @discord.ui.button(label="Riff 1", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="Riff 1", style=discord.ButtonStyle.blurple, row=0,
+        custom_id=f'{short_id_generator()}-riff-1')
     async def riff_button_1(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
@@ -144,7 +206,8 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_riff(interaction, button, 1)
 
-    @discord.ui.button(label="Riff 2", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="Riff 2", style=discord.ButtonStyle.blurple, row=0,
+        custom_id=f'{short_id_generator()}-riff-2')
     async def riff_button_2(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
@@ -152,7 +215,8 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_riff(interaction, button, 2)
 
-    @discord.ui.button(label="Riff 3", style=discord.ButtonStyle.blurple) # or .primary
+    @discord.ui.button(label="Riff 3", style=discord.ButtonStyle.blurple, row=0,
+        custom_id=f'{short_id_generator()}-riff-3')
     async def riff_button_3(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
@@ -160,7 +224,8 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_riff(interaction, button, 3)
 
-    @discord.ui.button(label="Upscale 0", style=discord.ButtonStyle.green) # or .primary
+    @discord.ui.button(label="Upscale 0", style=discord.ButtonStyle.green, row=1,
+        custom_id=f'{short_id_generator()}-upscale-0')
     async def upscale_button_0(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
@@ -168,7 +233,8 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_upscale(interaction, button, 0)
 
-    @discord.ui.button(label="Upscale 1", style=discord.ButtonStyle.green) # or .primary
+    @discord.ui.button(label="Upscale 1", style=discord.ButtonStyle.green, row=1,
+        custom_id=f'{short_id_generator()}-upscale-1')
     async def upscale_button_1(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
@@ -176,7 +242,8 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_upscale(interaction, button, 1)
 
-    @discord.ui.button(label="Upscale 2", style=discord.ButtonStyle.green) # or .primary
+    @discord.ui.button(label="Upscale 2", style=discord.ButtonStyle.green, row=1,
+        custom_id=f'{short_id_generator()}-upscale-2')
     async def upscale_button_2(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
@@ -184,7 +251,8 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_upscale(interaction, button, 2)
 
-    @discord.ui.button(label="Upscale 3", style=discord.ButtonStyle.green) # or .primary
+    @discord.ui.button(label="Upscale 3", style=discord.ButtonStyle.green, row=1,
+        custom_id=f'{short_id_generator()}-upscale-3')
     async def upscale_button_3(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
@@ -249,10 +317,13 @@ async def _image(
         short_id = output['id']
         seeds = output.get('seeds', None)
         file = discord.File(image_loc)
+        btns = FourImageButtons(message_id=work_msg.id, short_id=short_id)
+        btns.serialize_to_json_and_store()
+        client.add_view(btns, message_id=work_msg.id)
         await work_msg.edit(
             content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
             attachments=[file],
-            view=FourImageButtons(short_id=short_id))
+            view=btns)
         if seed_search is True:
             await channel.send(short_id)
         if seeds is not None:
@@ -361,10 +432,13 @@ async def _riff(
         short_id = output['id']
 
         file = discord.File(image_loc)
+        btns = FourImageButtons(message_id=work_msg.id, short_id=short_id)
+        btns.serialize_to_json_and_store()
+        client.add_view(btns, message_id=work_msg.id)
         await work_msg.edit(
             content=f'Image generation for riff on `{docarray_id}` index {str(idx)} for for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
             attachments=[file],
-            view=FourImageButtons(short_id=short_id))
+            view=btns)
     except Exception as e:
         await channel.send(f'Got unknown error on riff "{docarray_id}" index {str(idx)}: {str(e)}')
     finally:
@@ -743,7 +817,7 @@ async def on_message(message):
                 tags={
                     'text': '',
                     'generator': 'discord image upload',
-                    'request_time': time.time(),
+                    'request_time': int(time.time()),
                 },
             ).convert_blob_to_datauri()
             _d.text = message.clean_content
@@ -931,6 +1005,16 @@ async def on_message(message):
 
 @client.event
 async def on_ready():
+    print('Loading old buttons back into memory')
+    now = int(time.time())
+    forty_eight_hours_ago = now - 2 * 24 * 60 * 60
+    # init the button handler and load up any previously saved buttons. Skip
+    # any buttons that are more than 48 hours old.
+    for view_dict in button_store_dict[BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY]:
+        if view_dict['time'] >= forty_eight_hours_ago:
+            view = FourImageButtons.from_serialized(view_dict)
+            client.add_view(view, message_id=view_dict['message_id'])
+
     print('Bot is alive')
 
 
