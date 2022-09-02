@@ -6,7 +6,7 @@
 
 - **Highly Scalable**: Leverages `dalle-flow` gRPC interface to independently serve images from any number of GPUs, while higher memory calls to the gRPC through the bot are forked onto individual instances of Python.
 - **Support For Other Popular Models**: Latent diffusion GLID3XL or DALLE-MEGA can easily by turned on in addition to Stable Diffusion through `dalle-flow` for text-to-image generation.
-- **Support For Low VRAM GPUS**: Locally maintained branch `optimized-sd` of `dalle-flow` supports image generation with GPUs >= 5 GB.
+- **Support For Low VRAM GPUS**: Locally maintained branch `sd-lite` of `dalle-flow` supports image generation with GPUs >= 5 GB.
 - **Supports Slash and Legacy Style Commands**: While Discord is moving towards the new slash style commands that feature auto-completion functions, YASD Discord Bot also features direct commands prefixed with `>` -- whichever you find easier.
 - **Easy User Interface Including Buttons and Loading Indicators**: Riffing and upscaling your creations has never been easier! It even comes with a [manual](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme)!
 - **Stores All Images and Prompts by Default**: Never lose your previous generations!
@@ -17,7 +17,8 @@
 - [Content advisory](#content-advisory)
 - [What do I need?](#what-do-i-need)
 - [Installation](#installation)
-  - [Docker](#docker-installation-build-docker-image-yourself)
+  - [Docker Image](#docker-installation-docker-image)
+  - [Docker Self-Build](#docker-installation-build-docker-image-yourself)
   - [Native (Low VRAM)](#native-installation)
 - [What can it do?](#what-can-it-do)
 - [User Manual](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme)
@@ -28,6 +29,7 @@
 
 ## Changelog
 
+- 2022-08-30: `optimized-sd` branch has moved to `sd-lite` branch, which will be merged upstream. Includes small bugfixes and enhanced interpolation. Upstream docker image is now functional, so instructions have been added for installing that.
 - 2022-08-30: Updated to add slash commands in addition to legacy commands, added a manual link instead of help, added multi-user support (more than one user may now use the bot at a time without waiting), added `interpolate` command.
 - 2022-08-28: Add ability to use with low VRAM cards through optimized `dalle-flow` branch `optimized-sd`.
 - 2022-08-27: Add content advisory.
@@ -42,11 +44,15 @@ This bot does not come equipped with a NSFW filter for content and will make any
 
 ## What do I need?
 
+Python 3 3.9+ with pip and virtualenv installed (Ubuntu 22.04 works great!)
+
+CUDA runtime environment installed
+
 An NVIDIA GPU with >= 16 GB of VRAM (docker or native installation)
 
 OR
 
-An NVIDIA GPU with >= 5 GB of VRAM using the `dalle-flow` `optimized-sd` branch (no docker option, follow [Native installation](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot#native-installation) below carefully)
+An NVIDIA GPU with >= 5 GB of VRAM using the `dalle-flow` `sd-lite` branch (no docker option, follow [Native installation](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot#native-installation) below carefully)
 
 If running with a low VRAM GPU, you will not have access to the `>upscale` endpoint and will not have the ability to use multiple samplers. Pay close attention to all steps labeled **LOW VRAM GPU USERS** in the installation instructions.
 
@@ -59,6 +65,65 @@ This installation is intended for debian or arch flavored linux users. YMMV. You
 sudo apt install python3 python3-pip
 sudo pip3 install virtualenv
 ```
+
+
+### Docker installation (docker image)
+
+Install the [Nvidia docker container environment](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#installing-on-ubuntu-and-debian) if you have not already.
+
+
+Pull the `dalle-flow` docker image with:
+
+```bash
+docker pull jinaai/dalle-flow:latest
+```
+
+Go to [Huggingface's repository for the latest version](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original), log in, agree to the terms and conditions, then download `sd-v1-4.ckpt`. Rename that to `model.ckpt` and then, from that directory, run the following commands:
+
+```bash
+mkdir ~/ldm
+mkdir ~/ldm/stable-diffusion-v1
+mv model.ckpt ~/ldm/stable-diffusion-v1/model.ckpt
+```
+
+Then run the container with this command:
+
+```
+sudo docker run -e DISABLE_CLIP="1" \
+  -e DISABLE_DALLE_MEGA="1" \
+  -e DISABLE_GLID3XL="1" \
+  -e ENABLE_STABLE_DIFFUSION="1" \
+  -p 51005:51005 \
+  -it \
+  -v ~/ldm:/dalle/stable-diffusion/models/ldm/ \
+  -v $HOME/.cache:/home/dalle/.cache \
+  --gpus all \
+  jinaai/dalle-flow
+```
+
+Somewhere else, clone this repository and follow these steps:
+
+```bash
+git clone https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/
+cd yasd-discord-bot
+python3 -m virtualenv env
+source env/bin/activate
+pip install -r requirements.txt
+```
+
+Then you can start the bot with:
+
+```bash
+python bot.py YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
+```
+
+**Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
+
+Where YOUR_DISCORD_BOT_TOKEN is your [token](https://discordpy.readthedocs.io/en/stable/discord.html) and YOUR_GUILD_ID is the integer ID for your server (right click on the server name, then click "Copy ID"). Supplying the guild ID is optional, but it will result in the slash commands being available to your server almost instantly. Once the bot is connected, you can read about how to use it with `>help`.
+
+The bot uses the folders as a bus to store/shuttle data. All images created are stored in `images/`.
+
+OPTIONAL: If you aren't running jina on the same box, you will need change the address to connect to declared as constant `JINA_SERVER_URL` in `imagetool.py`.
 
 
 ### Docker installation (build docker image yourself)
@@ -77,21 +142,22 @@ cd dalle-flow
 Go to [Huggingface's repository for the latest version](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original), log in, agree to the terms and conditions, then download `sd-v1-4.ckpt`. Rename that to `model.ckpt` and then, from that directory, run the following commands:
 
 ```bash
-mkdir ~/dalle/ldm
-mkdir ~/dalle/ldm/stable-diffusion-v1
-mv model.ckpt ~/dalle/ldm/stable-diffusion-v1/model.ckpt
+mkdir ~/ldm
+mkdir ~/ldm/stable-diffusion-v1
+mv model.ckpt ~/ldm/stable-diffusion-v1/model.ckpt
 ```
 
 In the `dalle-flow` folder (`cd ~/dalle/dalle-flow`), build with this command:
 
 ```bash
-sudo docker build -t dalle-flow -f ./Dockerfile .
+docker build --build-arg GROUP_ID=$(id -g ${USER}) --build-arg USER_ID=$(id -u ${USER}) -t jinaai/dalle-flow .
 ```
 
 Then run the container with this command:
 
 ```
-sudo docker run -e DISABLE_DALLE_MEGA="1" \
+sudo docker run -e DISABLE_CLIP="1" \
+  -e DISABLE_DALLE_MEGA="1" \
   -e DISABLE_GLID3XL="1" \
   -e ENABLE_STABLE_DIFFUSION="1" \
   -p 51005:51005 \
@@ -99,7 +165,7 @@ sudo docker run -e DISABLE_DALLE_MEGA="1" \
   -v ~/ldm:/dalle/stable-diffusion/models/ldm/ \
   -v $HOME/.cache:/home/dalle/.cache \
   --gpus all \
-  dalle-flow
+  jinaai/dalle-flow
 ```
 
 Somewhere else, clone this repository and follow these steps:
@@ -138,7 +204,7 @@ In the instructions for [dalle-flow](https://github.com/jina-ai/dalle-flow), use
 
 ```bash
 mkdir dalle && cd dalle
-git clone --single-branch --branch optimized-sd https://github.com/AmericanPresidentJimmyCarter/dalle-flow/
+git clone --single-branch --branch sd-lite https://github.com/AmericanPresidentJimmyCarter/dalle-flow/
 git clone https://github.com/jina-ai/SwinIR
 git clone https://github.com/CompVis/stable-diffusion
 git clone https://github.com/CompVis/latent-diffusion
@@ -155,7 +221,7 @@ Need to download the weights? Go to [Huggingface's repository for the latest ver
 To start jina with old models disabled when you're all done:
 
 ```bash
-python flow_parser.py --enable-stable-diffusion --disable-dalle-mega --disable-glid3xl
+python flow_parser.py --enable-stable-diffusion-lite --disable-dalle-mega --disable-glid3xl
 jina flow --uses flow.tmp.yml
 ```
 
