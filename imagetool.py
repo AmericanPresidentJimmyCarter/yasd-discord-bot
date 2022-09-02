@@ -1,13 +1,15 @@
 import argparse
 import json
+import numpy as np
 import random
 import string
 import traceback
 
 from copy import deepcopy
 from io import BytesIO
+from urllib.request import urlopen
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 from docarray import Document, DocumentArray
 
 # You may need to change this.
@@ -20,6 +22,11 @@ args = parser.parse_args()
 
 FILE_NAME_IN = f'temp_json/request-{args.suffix}.json'
 FILE_NAME_OUT = f'temp_json/output-{args.suffix}.json'
+
+
+def document_to_pil(doc):
+    uri_data = urlopen(doc.uri)
+    return Image.open(BytesIO(uri_data.read()))
 
 
 def short_id_generator():
@@ -41,6 +48,95 @@ def strip_square(s):
     return ret
 
 
+def shuffle_by_lines_and_blur(img: Image, sz: tuple[int], horizontal=True):
+    img = img.resize(sz)
+    if not horizontal:
+        img = img.rotate(90, expand=True)
+    channel_count = len(img.getbands())
+    img_arr = np.reshape(img, (img.height, img.width, channel_count))
+    channels = [img_arr[:,:,x] for x in range(channel_count)]
+    random_perm = np.random.permutation(img.height)
+    shuffled_img_arr = np.dstack([x[random_perm, :] for x in channels]).astype(np.uint8)
+    shuffled_img = Image.fromarray(shuffled_img_arr)
+    shuffled_img = shuffled_img.filter(ImageFilter.GaussianBlur(radius = 24))
+    if not horizontal:
+       shuffled_img = shuffled_img.rotate(-90, expand=True)
+    return shuffled_img
+
+
+def mono_gradient(draw: ImageDraw, offset: int, sz: tuple[int], fr: int, to:int,
+    horizontal: bool=True):
+    def interpolate(f_co, t_co, interval):
+        det_co = (t_co - f_co) / interval
+        for i in range(interval):
+            yield round(f_co + det_co * i)
+
+    for i, color in enumerate(interpolate(fr, to, sz[0])):
+        if horizontal:
+            draw.line([(i + offset, 0), (i + offset, sz[1])], color, width=1)
+        else: 
+            draw.line([(0, i + offset), (sz[0], i + offset)], color, width=1)
+
+
+def resize_with_padding(img, expected_size):
+    img_thumb = img.copy()
+    img_thumb.thumbnail(expected_size)
+    
+    delta_width = expected_size[0] - img_thumb.size[0]
+    delta_height = expected_size[1] - img_thumb.size[1]
+    pad_width = delta_width // 2
+    pad_height = delta_height // 2
+    padding = (
+        pad_width,
+        pad_height,
+        delta_width - pad_width,
+        delta_height - pad_height,
+    )
+    expanded = ImageOps.expand(img_thumb, padding)
+    noised = Image.new('RGB', expanded.size)
+    pixels = noised.load()
+    for x in range(noised.size[0]):
+        for y in range(noised.size[1]):
+            pixels[x, y] = (
+                random.randint(0, 255),
+                random.randint(0, 255),
+                random.randint(0, 255),
+            )
+
+    mask = Image.new('L', expanded.size, 0)
+    draw = ImageDraw.Draw(mask)
+
+    # Apply gradient overlays.
+    need_horiz = expanded.size[0] > img.size[0]
+    need_vert = expanded.size[1] > img.size[1]
+
+    blend = Image.new('L', expanded.size, 48)
+    if need_horiz:
+        blurred = shuffle_by_lines_and_blur(img, expanded.size, False)
+        noised = Image.composite(noised, blurred, blend)
+        mono_gradient(draw, expanded.size[0] // 2 - img_thumb.size[0] // 2, (
+            img_thumb.size[0] // 2,
+            expanded.size[1],
+        ), 0, 255)
+        mono_gradient(draw, expanded.size[0] // 2, (
+            img_thumb.size[0] // 2,
+            expanded.size[1],
+        ), 255, 0)
+    if need_vert:
+        blurred = shuffle_by_lines_and_blur(img, expanded.size, False)
+        noised = Image.composite(noised, blurred, blend)
+        mono_gradient(draw, expanded.size[1] // 2 - img_thumb.size[1] // 2, (
+            expanded.size[0],
+            img_thumb.size[1] // 2,
+        ), 0, 255, False)
+        mono_gradient(draw, expanded.size[1] // 2, (
+            expanded.size[0],
+            img_thumb.size[1] // 2,
+        ), 255, 0, False)
+
+    return Image.composite(expanded, noised, mask)
+
+
 output = {}
 with open(FILE_NAME_IN, 'r') as request_json:
     request = json.load(request_json)
@@ -49,6 +145,8 @@ with open(FILE_NAME_IN, 'r') as request_json:
         if request['type'] == 'prompt':
             prompt = request['prompt']
             params = {'num_images': 4}
+            if request.get('height', None) is not None:
+                params['height'] = request['height']
             if request.get('sampler', None) is not None:
                 params['sampler'] = request['sampler']
             if request.get('scale', None) is not None:
@@ -57,20 +155,26 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 params['seed'] = request['seed']
             if request.get('steps', None) is not None:
                 params['steps'] = request['steps']
+            if request.get('width', None) is not None:
+                params['width'] = request['width']
             da = Document(text=prompt.strip()).post(JINA_SERVER_URL,
                 parameters=params).matches
             short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
-            da.plot_image_sprites(output=image_loc, canvas_size=1024,
-                show_index=True)
+
+            image = document_to_pil(da[0])
+            orig_width, _ = image.size
+
+            da.plot_image_sprites(output=image_loc, canvas_size=orig_width*2,
+                keep_aspect_ratio=True, show_index=True)
             da.save_binary(docarray_loc, protocol='protobuf', compress='lz4')
 
             output['image_loc'] = image_loc
             output['docarray_loc'] = docarray_loc
             output['id'] = short_id
 
-        # Prompt
+        # Prompt array
         if request['type'] == 'promptarray':
             prompt = request['prompt']
             arr_idx = prompt.find('[')
@@ -91,6 +195,9 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 prompts = prompts[0:16]
 
             params = {'num_images': 1}
+
+            if request.get('height', None) is not None:
+                params['height'] = request['height']
             if request.get('sampler', None) is not None:
                 params['sampler'] = request['sampler']
             if request.get('scale', None) is not None:
@@ -101,6 +208,8 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 params['seed'] = 12345
             if request.get('steps', None) is not None:
                 params['steps'] = request['steps']
+            if request.get('width', None) is not None:
+                params['width'] = request['width']
 
             docs = []
             for pr in prompts:
@@ -108,11 +217,14 @@ with open(FILE_NAME_IN, 'r') as request_json:
                     parameters=params).matches[0])
             da = DocumentArray(docs)
 
+            image = document_to_pil(da[0])
+            orig_width, _ = image.size
+
             short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
-            da.plot_image_sprites(output=image_loc, canvas_size=1024,
-                show_index=True)
+            da.plot_image_sprites(output=image_loc, canvas_size=orig_width*2,
+                keep_aspect_ratio=True, show_index=True)
             da.save_binary(docarray_loc, protocol='protobuf', compress='lz4')
 
             output['image_loc'] = image_loc
@@ -124,6 +236,8 @@ with open(FILE_NAME_IN, 'r') as request_json:
             prompt = request['prompt']
 
             params = {'num_images': 1}
+            if request.get('height', None) is not None:
+                params['height'] = request['height']
             if request.get('sampler', None) is not None:
                 params['sampler'] = request['sampler']
             if request.get('scale', None) is not None:
@@ -134,6 +248,8 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 params['seed'] = 1
             if request.get('steps', None) is not None:
                 params['steps'] = request['steps']
+            if request.get('width', None) is not None:
+                params['width'] = request['width']
 
             seeds = []
             docs = []
@@ -143,12 +259,14 @@ with open(FILE_NAME_IN, 'r') as request_json:
                     parameters=params).matches[0])
                 params['seed'] += 1
             da = DocumentArray(docs)
+            image = document_to_pil(da[0])
+            orig_width, _ = image.size
 
             short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
-            da.plot_image_sprites(output=image_loc, canvas_size=1024,
-                show_index=True)
+            da.plot_image_sprites(output=image_loc, canvas_size=orig_width*2,
+                keep_aspect_ratio=True, show_index=True)
             da.save_binary(docarray_loc, protocol='protobuf', compress='lz4')
 
             output['image_loc'] = image_loc
@@ -161,7 +279,12 @@ with open(FILE_NAME_IN, 'r') as request_json:
             iterations = request.get('iterations', None)
             if iterations is None:
                 iterations = 1
+
             da = None
+            orig_width = None
+            orig_height = None
+            orig_image = None
+            orig_prompt = None
             if not request.get('from_discord', False):
                 docarray_id = request['docarray_id']
                 idx = request['index']
@@ -170,9 +293,16 @@ with open(FILE_NAME_IN, 'r') as request_json:
                     old_docarray_loc, protocol='protobuf', compress='lz4'
                 )
                 da = DocumentArray([da[idx]])
+                image = document_to_pil(da[0])
+                orig_width, orig_height = image.size
+                orig_image = image
+                orig_prompt = da[0].text
             else:
                 prompt = request.get('prompt', None)
+                orig_prompt = prompt
                 img = Image.open(request['filename'])
+                orig_width, orig_height = image.size
+                orig_image = image
                 buffered = BytesIO()
                 img.save(buffered, format='PNG')
                 _d = Document(
@@ -183,6 +313,10 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 da = DocumentArray([_d])
 
             params = {'num_images': 4}
+            if request.get('height', None) is not None:
+                params['height'] = request['height']
+            else:
+                params['height'] = orig_height
             if request.get('latentless', None) is not None:
                 params['latentless'] = request['latentless']
             if request.get('prompt', None) is not None:
@@ -195,23 +329,57 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 params['seed'] = request['seed']
             if request.get('strength', None) is not None:
                 params['strength'] = request['strength']
+            if request.get('width', None) is not None:
+                params['width'] = request['width']
+            else:
+                params['width'] = orig_width
 
-            if iterations > 1:
-                for _ in range(iterations - 1):
+            diffused_da = None
+            if params['height'] != orig_height or \
+                params['width'] != orig_width:
+                img_new = resize_with_padding(orig_image,
+                    (params['width'], params['height']))
+                buffered = BytesIO()
+                img_new.save(buffered, format='PNG')
+                _d = Document(
+                    blob=buffered.getvalue(),
+                    mime_type='image/png',
+                ).convert_blob_to_datauri()
+                _d.text = orig_prompt
+
+                # "Not outpainting"
+                FINAL_STAGE = 0.65
+                for _strength in np.linspace(0.15, FINAL_STAGE, 8):
+                    da = DocumentArray([_d])
                     params_copy = deepcopy(params)
                     params_copy['num_images'] = 1
-                    da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
-                        parameters=params_copy)[0].matches
+                    params_copy['strength'] = _strength
+                    if _strength != FINAL_STAGE:
+                        da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
+                            parameters=params_copy)[0].matches
+                    else:
+                        params_copy['num_images'] = 4
+                        da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
+                            parameters=params_copy)[0].matches
+                        
+                diffused_da = da
+            else:
+                if iterations > 1:
+                    for _ in range(iterations - 1):
+                        params_copy = deepcopy(params)
+                        params_copy['num_images'] = 1
+                        da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
+                            parameters=params_copy)[0].matches
 
-            diffused_da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
-                parameters=params)[0].matches
+                diffused_da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
+                    parameters=params)[0].matches
 
             short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
 
             diffused_da.plot_image_sprites(output=image_loc, show_index=True,
-                canvas_size=1024)
+                keep_aspect_ratio=True, canvas_size=params['width']*2)
             diffused_da.save_binary(docarray_loc, protocol='protobuf',
                 compress='lz4')
 
@@ -224,6 +392,8 @@ with open(FILE_NAME_IN, 'r') as request_json:
             params = {'num_images': 9}
             prompt = request['prompt']
 
+            if request.get('height', None) is not None:
+                params['height'] = request['sampler']
             if request.get('sampler', None) is not None:
                 params['sampler'] = request['sampler']
             if request.get('scale', None) is not None:
@@ -232,17 +402,21 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 params['seed'] = request['seed']
             if request.get('strength', None) is not None:
                 params['strength'] = request['strength']
+            if request.get('width', None) is not None:
+                params['width'] = request['width']
 
             interpolated_da = Document(text=prompt.strip()).post(
                 f'{JINA_SERVER_URL}/stableinterpolate',
                 parameters=params).matches
+            image = document_to_pil(interpolated_da[0])
+            orig_width, _ = image.size
 
             short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
             docarray_loc = f'image_docarrays/{short_id}.bin'
 
             interpolated_da.plot_image_sprites(output=image_loc, show_index=True,
-                canvas_size=512*3)
+                keep_aspect_ratio=True, canvas_size=orig_width*3)
             interpolated_da.save_binary(docarray_loc, protocol='protobuf',
                 compress='lz4')
 
@@ -259,16 +433,22 @@ with open(FILE_NAME_IN, 'r') as request_json:
             da  = DocumentArray.load_binary(
                 old_docarray_loc, protocol='protobuf', compress='lz4'
             )
+            image = document_to_pil(da[idx])
+            orig_width, _ = image.size
 
             upscale = da[idx].post(f'{JINA_SERVER_URL}/upscale')
 
             short_id = short_id_generator()
             image_loc = f'images/{short_id}.png'
+            image_loc_jpeg = f'images/{short_id}.jpg'
 
             da_upscale = DocumentArray([upscale])
             da_upscale.plot_image_sprites(image_loc,
-                canvas_size=1024)
-            output['image_loc'] = image_loc
+                keep_aspect_ratio=True, canvas_size=orig_width*4)
+            image_png = Image.open(image_loc)
+            image_jpg = image_png.save(image_loc_jpeg,
+                quality=95, optimize=True, progressive=True)
+            output['image_loc'] = image_loc_jpeg
     except Exception as e:
         traceback.print_exc()
         output['error'] = str(e)

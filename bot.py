@@ -6,9 +6,9 @@ import random
 import string
 import time
 
-from docarray import Document, DocumentArray
 from io import BytesIO
 from typing import Any, Optional, Union
+from urllib.request import urlopen
 
 import discord
 
@@ -16,6 +16,7 @@ from PIL import Image
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, View
+from docarray import Document, DocumentArray
 
 
 parser = argparse.ArgumentParser()
@@ -48,6 +49,9 @@ MIN_STRENGTH = 0.01
 MIN_STRENGTH_INTERPOLATE = 0.50
 MAX_STRENGTH = 0.99
 NUM_IMAGES_MAX = 9
+MIN_IMAGE_HEIGHT_WIDTH = 384
+MAX_IMAGE_HEIGHT_WIDTH = 768
+VALID_IMAGE_HEIGHT_WIDTH = { 384, 448, 512, 576, 640, 704, 768 }
 
 
 def short_id_generator():
@@ -70,6 +74,16 @@ else:
         app_commands.Choice(name="euler_ancestral", value="euler_ancestral"),
     ]
 
+HEIGHT_AND_WIDTH_CHOICES = [
+    app_commands.Choice(name="512", value=512),
+    app_commands.Choice(name="384", value=384),
+    app_commands.Choice(name="448", value=448),
+    app_commands.Choice(name="576", value=576),
+    app_commands.Choice(name="640", value=640),
+    app_commands.Choice(name="704", value=704),
+    app_commands.Choice(name="768", value=768),
+]
+
 pathlib.Path('./image_docarrays').mkdir(parents=True, exist_ok=True)
 pathlib.Path('./images').mkdir(parents=True, exist_ok=True)
 pathlib.Path('./temp_json').mkdir(parents=True, exist_ok=True)
@@ -87,10 +101,33 @@ if bs_fn.is_file():
     with open(bs_fn, 'r') as bs:
         button_store_dict = json.load(bs)
 
+
 def write_button_store():
     global button_store_dict
     with open(bs_fn, 'w') as bs:
         json.dump(button_store_dict, bs)
+
+
+def resize_image(image):
+    w, h = image.size
+    ratio = float(w) / float(h)
+    if ratio > 1:
+        w = MAX_IMAGE_HEIGHT_WIDTH
+        h = int(float(MAX_IMAGE_HEIGHT_WIDTH) / ratio)
+        if h < MIN_IMAGE_HEIGHT_WIDTH:
+            h = MIN_IMAGE_HEIGHT_WIDTH
+    if ratio < 1:
+        w = int(float(MAX_IMAGE_HEIGHT_WIDTH) * ratio)
+        if w < MIN_IMAGE_HEIGHT_WIDTH:
+            w = MIN_IMAGE_HEIGHT_WIDTH
+        h = MAX_IMAGE_HEIGHT_WIDTH
+    w, h = map(lambda x: x - x % 64, (w, h))  # resize to integer multiple of 64
+    return image.resize((w, h), resample=Image.LANCZOS)
+
+
+def document_to_pil(doc):
+    uri_data = urlopen(doc.uri)
+    return Image.open(BytesIO(uri_data.read()))
 
 
 intents = discord.Intents(
@@ -99,6 +136,7 @@ intents = discord.Intents(
     guild_messages=True,
     message_content=True,
 )
+
 
 class YASDClient(discord.Client):
     def __init__(self):
@@ -118,12 +156,25 @@ client = YASDClient()
 
 
 class FourImageButtons(discord.ui.View):
+    RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE = 'Select Riff Aspect Ratio'
+
+    pixels_height = 512
     message_id = None
     short_id = None
+    pixels_width = 512
     def __init__(self, *, message_id=None, short_id=None, timeout=None):
         super().__init__(timeout=timeout)
         self.message_id = message_id
         self.short_id = short_id
+
+        old_docarray_loc = f'image_docarrays/{short_id}.bin'
+        da = DocumentArray.load_binary(
+            old_docarray_loc, protocol='protobuf', compress='lz4'
+        )
+        loaded = document_to_pil(da[0])
+        orig_width, orig_height = loaded.size
+        self.pixels_width = orig_width
+        self.pixels_height = orig_height
 
     def serialize_to_json_and_store(self):
         '''
@@ -131,14 +182,17 @@ class FourImageButtons(discord.ui.View):
         '''
         global button_store_dict
         as_dict = {
+            'height': self.pixels_height,
             'message_id': self.message_id,
             'short_id': self.short_id,
             'items': [ {
-                'label': btn.label,
-                'custom_id': btn.custom_id,
-                'row': btn.row,
-            } for btn in self.children ],
+                'label': item.label if getattr(item, 'label', None) is not None
+                    else getattr(item, 'placeholder', None),
+                'custom_id': item.custom_id,
+                'row': item.row,
+            } for item in self.children ],
             'time': int(time.time()),
+            'width': self.pixels_width,
         }
         button_store_dict[BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY].append(as_dict)
         write_button_store()
@@ -152,10 +206,27 @@ class FourImageButtons(discord.ui.View):
         short_id = serialized['short_id']
         fib = cls(message_id=message_id, short_id=short_id)
 
-        mapped_to_label = { btn.label: btn for btn in fib.children }
-        for btn_dict in serialized['items']:
-            btn = mapped_to_label[btn_dict['label']]
-            btn.custom_id = btn_dict['custom_id']
+        def labels_for_map(item):
+            if isinstance(item, discord.ui.Button):
+                return item.label
+            if isinstance(item, discord.ui.Select):
+                return item.placeholder
+            return None
+
+        mapped_to_label = { labels_for_map(item): item
+            for item in fib.children }
+        for item_dict in serialized['items']:
+            if item_dict['label'] == fib.RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE:
+                btn = mapped_to_label[item_dict['label']]
+                btn.custom_id = item_dict['custom_id']
+            else:
+                btn = mapped_to_label[item_dict['label']]
+                btn.custom_id = item_dict['custom_id']
+        
+        if serialized.get('height', None) is not None:
+            fib.height = int(serialized['height'])
+        if serialized.get('width', None) is not None:
+            fib.width = int(serialized['width'])
 
         return fib
 
@@ -175,7 +246,8 @@ class FourImageButtons(discord.ui.View):
         idx: int,
     ):
         await interaction.response.defer()
-        await _riff(interaction.channel, interaction.user, self.short_id, idx)
+        await _riff(interaction.channel, interaction.user, self.short_id, idx,
+            height=self.pixels_height, width=self.pixels_width)
 
     async def handle_upscale(self,
         interaction: discord.Interaction,
@@ -186,7 +258,6 @@ class FourImageButtons(discord.ui.View):
         await interaction.message.edit(view=self)
         await interaction.response.defer()
         await _upscale(interaction.channel, interaction.user, self.short_id, idx)
-
 
     @discord.ui.button(label="Riff 0", style=discord.ButtonStyle.blurple, row=0,
         custom_id=f'{short_id_generator()}-riff-0')
@@ -260,17 +331,51 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_upscale(interaction, button, 3)
 
+    @discord.ui.select(placeholder=RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE, row=2,
+        custom_id=f'{short_id_generator()}-riff-select-aspect-ratio',
+        options=[
+            discord.SelectOption(label='2:1 (landscape)', value='2:1'),
+            discord.SelectOption(label='3:2', value='3:2'),
+            discord.SelectOption(label='1:1 (square)', value='1:1'),
+            discord.SelectOption(label='2:3', value='2:3'),
+            discord.SelectOption(label='1:2 (portait)', value='1:2'),
+        ])
+    async def select_aspect_ratio(self, interaction: discord.Interaction,
+        selection: discord.ui.Select):
+        selected = selection.values
+        sel = selected[0]
+        if sel == '2:1':
+            self.pixels_height = 384
+            self.pixels_width = 768
+        if sel == '3:2': # ish
+            self.pixels_height = 448
+            self.pixels_width = 704
+        if sel == '1:1':
+            self.pixels_height = 512
+            self.pixels_width = 512
+        if sel == '2:3': # ish
+            self.pixels_height = 704
+            self.pixels_width = 448
+        if sel == '1:2':
+            self.pixels_height = 768
+            self.pixels_width = 384
+        await interaction.response.defer()
+
+
 
 async def _image(
     channel: discord.abc.GuildChannel,
     user: discord.abc.User,
 
     prompt: str,
+
+    height: Optional[int]=None,
     sampler: Optional[str]=None,
     scale: Optional[float]=None,
     seed: Optional[int]=None,
     seed_search: bool=None,
     steps: Optional[int]=None,
+    width: Optional[int]=None,
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
@@ -292,12 +397,14 @@ async def _image(
     try:
         # Make the request in the filesystem pipeline
         req = {
+            'height': height,
             'prompt': prompt,
             'sampler': sampler,
             'scale': scale,
             'seed': seed,
             'steps': steps,
             'type': typ,
+            'width': width,
         }
         with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id), 'w') as inp:
             inp.write(json.dumps(req))
@@ -317,13 +424,18 @@ async def _image(
         short_id = output['id']
         seeds = output.get('seeds', None)
         file = discord.File(image_loc)
-        btns = FourImageButtons(message_id=work_msg.id, short_id=short_id)
-        btns.serialize_to_json_and_store()
-        client.add_view(btns, message_id=work_msg.id)
-        await work_msg.edit(
-            content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
-            attachments=[file],
-            view=btns)
+        if seed_search is True:
+            await work_msg.edit(
+                content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
+                attachments=[file])
+        else:
+            btns = FourImageButtons(message_id=work_msg.id, short_id=short_id)
+            btns.serialize_to_json_and_store()
+            client.add_view(btns, message_id=work_msg.id)
+            await work_msg.edit(
+                content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
+                attachments=[file],
+                view=btns)
         if seed_search is True:
             await channel.send(short_id)
         if seeds is not None:
@@ -346,30 +458,40 @@ async def _image(
         'e.g. "a [red, blue] ball"',
 )
 @app_commands.describe(
+    height='Height of the image',
     sampler='Which sampling algorithm to use (k_lms, ddim, dpm2, dpm2_ancestral, heun, euler, or euler_ancestral. default k_lms)',
-    scale='conditioning scale for prompt (1.0 to 50.0)',
-    seed='deterministic seed for prompt (1 to 2^32-1)',
-    seed_search='seed searching mode, enumerates 9 different seeds starting at given seed',
-    steps='number of steps to perform (10 to 250)',
+    scale='Conditioning scale for prompt (1.0 to 50.0)',
+    seed='Deterministic seed for prompt (1 to 2^32-1)',
+    seed_search='Seed searching mode, enumerates 9 different seeds starting at given seed',
+    steps='Number of steps to perform (10 to 250)',
+    width='Width of the image',
 )
-@app_commands.choices(sampler=SAMPLER_CHOICES)
+@app_commands.choices(
+    height=HEIGHT_AND_WIDTH_CHOICES,
+    sampler=SAMPLER_CHOICES,
+    width=HEIGHT_AND_WIDTH_CHOICES,
+)
 async def image(
     interaction: discord.Interaction,
 
     prompt: str,
+    height: Optional[app_commands.Choice[int]] = None,
     sampler: Optional[app_commands.Choice[str]] = None,
     scale: Optional[app_commands.Range[float, 1.0, 50.0]] = None,
     seed: Optional[app_commands.Range[int, 0, MAX_SEED]] = None,
     seed_search: Optional[bool]=False,
     steps: Optional[app_commands.Range[int, MIN_STEPS, MAX_STEPS]] = None,
+    width: Optional[app_commands.Choice[int]] = None,
 ):
     await interaction.response.defer(thinking=True)
     sid = await _image(interaction.channel, interaction.user, prompt,
+        height=height.value if height is not None else None,
         sampler=sampler.value if sampler is not None else None,
         scale=scale,
         seed=seed,
         seed_search=bool(seed_search),
-        steps=steps)
+        steps=steps,
+        width=width.value if width is not None else None)
     if sid is not None:
         await interaction.followup.send(sid)
     else:
@@ -382,6 +504,8 @@ async def _riff(
 
     docarray_id: str,
     idx: int,
+
+    height: Optional[int]=None,
     iterations: Optional[int]=None,
     latentless: bool=False,
     prompt: Optional[str]=None,
@@ -389,6 +513,7 @@ async def _riff(
     scale: Optional[float]=None,
     seed: Optional[int]=None,
     strength: Optional[float]=None,
+    width: Optional[int]=None,
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
@@ -404,6 +529,7 @@ async def _riff(
         # Make the request in the filesystem pipeline
         req = {
             'docarray_id': docarray_id,
+            'height': height,
             'index': idx,
             'iterations': iterations,
             'latentless': latentless,
@@ -413,6 +539,7 @@ async def _riff(
             'seed': seed,
             'strength': strength,
             'type': 'riff',
+            'width': width,
         }
         with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id), 'w') as inp:
             inp.write(json.dumps(req))
@@ -436,7 +563,7 @@ async def _riff(
         btns.serialize_to_json_and_store()
         client.add_view(btns, message_id=work_msg.id)
         await work_msg.edit(
-            content=f'Image generation for riff on `{docarray_id}` index {str(idx)} for for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
+            content=f'Image generation for riff on `{docarray_id}` index {str(idx)} for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
             attachments=[file],
             view=btns)
     except Exception as e:
@@ -452,6 +579,7 @@ async def _riff(
 )
 @app_commands.describe(
     docarray_id='The ID for the bot-generated image you want to riff',
+    height='Height of the image',
     idx='The index of the bot generated image you want to riff',
     iterations='Number of diffusion iterations (1 to 16)',
     latentless='Do not compute latent embeddings from original image',
@@ -460,12 +588,20 @@ async def _riff(
     scale='Conditioning scale for prompt (1.0 to 50.0)',
     seed='Deterministic seed for prompt (1 to 2^32-1)',
     strength="Strength of conditioning (0.01 <= strength <= 0.99)",
+    width='Width of the image',
 )
-@app_commands.choices(sampler=SAMPLER_CHOICES)
+@app_commands.choices(
+    height=HEIGHT_AND_WIDTH_CHOICES,
+    sampler=SAMPLER_CHOICES,
+    width=HEIGHT_AND_WIDTH_CHOICES,
+)
 async def riff(
     interaction: discord.Interaction,
+
     docarray_id: str,
     idx: app_commands.Range[int, 0, NUM_IMAGES_MAX-1],
+
+    height: Optional[app_commands.Choice[int]] = None,
     iterations: Optional[app_commands.Range[int, MIN_ITERATIONS, MAX_ITERATIONS]] = None,
     latentless: Optional[bool]=False,
     prompt: Optional[str]=None,
@@ -473,16 +609,19 @@ async def riff(
     scale: Optional[app_commands.Range[float, MIN_SCALE, MAX_SCALE]] = None,
     seed: Optional[app_commands.Range[int, 0, MAX_SEED]] = None,
     strength: Optional[app_commands.Range[float, MIN_STRENGTH, MAX_STRENGTH]] = None,
+    width: Optional[app_commands.Choice[int]] = None,
 ):
     await interaction.response.defer(thinking=True)
     sid = await _riff(interaction.channel, interaction.user, docarray_id, idx,
+        height=height.value if height is not None else None,
         iterations=iterations,
         latentless=bool(latentless),
         prompt=prompt,
         sampler=sampler.value if sampler is not None else None,
         scale=scale,
         seed=seed,
-        strength=strength)
+        strength=strength,
+        width=width.value if width is not None else None)
     if sid is not None:
         await interaction.followup.send(sid)
     else:
@@ -495,10 +634,13 @@ async def _interpolate(
 
     prompt1: str,
     prompt2: str,
+
+    height: Optional[int]=None,
     sampler: Optional[str]=None,
     scale: Optional[float]=None,
     seed: Optional[int]=None,
     strength: Optional[float]=None,
+    width: Optional[int]=None,
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
@@ -513,12 +655,14 @@ async def _interpolate(
     try:
         # Make the request in the filesystem pipeline
         req = {
-            'type': 'interpolate',
+            'height': height,
             'prompt': f'{prompt1}|{prompt2}',
             'sampler': sampler,
             'scale': scale,
             'seed': seed,
             'strength': strength,
+            'type': 'interpolate',
+            'width': width,
         }
         with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id), 'w') as inp:
             inp.write(json.dumps(req))
@@ -555,27 +699,38 @@ async def _interpolate(
 @app_commands.describe(
     prompt1='The starting prompt',
     prompt2='The ending prompt',
+    height='Height of the image',
     sampler='Which sampling algorithm to use (k_lms, ddim, dpm2, dpm2_ancestral, heun, euler, or euler_ancestral. default k_lms)',
     scale='Conditioning scale for prompt (1.0 to 50.0)',
     seed='Deterministic seed for prompt (1 to 2^32-1)',
     strength="Strength of conditioning (0.01 <= strength <= 0.99)",
+    width='Height of the image',
 )
-@app_commands.choices(sampler=SAMPLER_CHOICES)
+@app_commands.choices(
+    height=HEIGHT_AND_WIDTH_CHOICES,
+    sampler=SAMPLER_CHOICES,
+    width=HEIGHT_AND_WIDTH_CHOICES,
+)
 async def interpolate(
     interaction: discord.Interaction,
     prompt1: str,
     prompt2: str,
+
+    height: Optional[app_commands.Choice[int]] = None,
     sampler: Optional[app_commands.Choice[str]] = None,
     scale: Optional[app_commands.Range[float, MIN_SCALE, MAX_SCALE]] = None,
     seed: Optional[app_commands.Range[int, 0, MAX_SEED]] = None,
     strength: Optional[app_commands.Range[float, MIN_STRENGTH, MAX_STRENGTH]] = None,
+    width: Optional[app_commands.Choice[int]] = None,
 ):
     await interaction.response.defer(thinking=True)
     sid = await _interpolate(interaction.channel, interaction.user, prompt1, prompt2,
+        height=height.value if height is not None else None,
         sampler=sampler.value if sampler is not None else None,
         scale=scale,
         seed=seed,
-        strength=strength)
+        strength=strength,
+        width=width.value if width is not None else None)
     if sid is not None:
         await interaction.followup.send(sid)
     else:
@@ -652,7 +807,8 @@ async def upscale(
 async def on_message(message):
     '''
     The on_message handler exists for the sole purpose of letting users upload
-    images to store and use to generate riffs as the old image2image pipeline.
+    images to store and use to generate riffs as the old image2image pipeline
+    along with being able to use all of the legacy commands.
     Discord sucks and decided it would be cool to make every bot move to the
     slash command without any way to upload things using a slash command.
 
@@ -665,11 +821,13 @@ async def on_message(message):
     if isinstance(message.clean_content, str) and \
         message.clean_content.startswith('>image '):
         prompt = message.clean_content[7:]
+        height = None
         sampler = None
         scale = None
         seed = None
         seed_search = False
         steps = None
+        width = None
 
         parens_idx = prompt.find('(')
         if parens_idx >= 0:
@@ -683,6 +841,13 @@ async def on_message(message):
                     pass
                 if 'sampler' in opts:
                     sampler = opts['sampler']
+                if 'height' in opts:
+                    try:
+                        height_int = int(opts['height'])
+                        if height_int in VALID_IMAGE_HEIGHT_WIDTH:
+                            height = height_int
+                    except Exception:
+                        pass
                 if 'scale' in opts:
                     try:
                         scale_float = float(opts['scale'])
@@ -706,9 +871,16 @@ async def on_message(message):
                             steps = steps_int
                     except Exception:
                         pass
+                if 'width' in opts:
+                    try:
+                        width_int = int(opts['width'])
+                        if width_int in VALID_IMAGE_HEIGHT_WIDTH:
+                            width = width_int
+                    except Exception:
+                        pass
             prompt = prompt[0:parens_idx]
-        await _image(message.channel, message.author, prompt,
-            sampler, scale, seed, seed_search, steps)
+        await _image(message.channel, message.author, prompt, height,
+            sampler, scale, seed, seed_search, steps, width)
         return
     if isinstance(message.clean_content, str) and \
         message.clean_content.startswith('>riff '):
@@ -728,6 +900,7 @@ async def on_message(message):
         if len(msg_split) > 3:
             text = ' '.join(msg_split[3:])
 
+        height = None
         iterations = None
         latentless = False
         prompt = None
@@ -735,6 +908,7 @@ async def on_message(message):
         scale = None
         seed = None
         strength = None
+        width = None
         if len(text) > 0 and text[0] == '(' and text[-1] == ')':
             opts = {}
             try:
@@ -743,6 +917,13 @@ async def on_message(message):
             except IndexError:
                 pass
 
+            if 'height' in opts:
+                try:
+                    height_int = int(opts['height'])
+                    if height_int in VALID_IMAGE_HEIGHT_WIDTH:
+                        height = height_int
+                except Exception:
+                    pass
             if 'prompt' in opts:
                 prompt = opts['prompt']
             if 'iterations' in opts:
@@ -777,15 +958,24 @@ async def on_message(message):
                         strength = strength_float
                 except Exception:
                     pass
+            if 'width' in opts:
+                try:
+                    width_int = int(opts['width'])
+                    if width_int in VALID_IMAGE_HEIGHT_WIDTH:
+                        width = width_int
+                except Exception:
+                    pass
 
         await _riff(message.channel, message.author, docarray_id, idx,
+            height=height,
             iterations=iterations,
             latentless=latentless,
             prompt=prompt,
             sampler=sampler,
             scale=scale,
             seed=seed,
-            strength=strength)
+            strength=strength,
+            width=width)
         return 
     if isinstance(message.clean_content, str) and \
         message.clean_content.startswith('>image2image'):
@@ -795,7 +985,7 @@ async def on_message(message):
         da_fn = f'image_docarrays/{sid}.bin'
         if len(message.attachments) != 1:
             await message.channel.send(
-                'Please upload a single image with your message (square is best)')
+                'Please upload a single image with your message')
         else:
             image_bytes = await message.attachments[0].read()
             try:
@@ -805,8 +995,7 @@ async def on_message(message):
                     f'Could not load image file for attachment {message.attachments[0].filename}')
                 return
 
-            # TODO Allow non-square image sizes
-            image = image.resize((512, 512)).convert('RGB')
+            image = resize_image(image).convert('RGB')
             image.save(image_fn, format='PNG')
 
             buffered = BytesIO()
@@ -895,10 +1084,12 @@ async def on_message(message):
                 'with >interpolate')
             return
 
+        height = None
         sampler = None
         scale = None
         seed = None
         strength = None
+        width = None
         parens_idx = prompt.find('(')
         if parens_idx >= 0:
             text = prompt[parens_idx:]
@@ -910,6 +1101,13 @@ async def on_message(message):
                 except IndexError:
                     pass
 
+                if 'height' in opts:
+                    try:
+                        height_int = int(opts['height'])
+                        if height_int in VALID_IMAGE_HEIGHT_WIDTH:
+                            height = height_int
+                    except Exception:
+                        pass
                 if 'sampler' in opts:
                     sampler = opts['sampler']
                 if 'scale' in opts:
@@ -933,13 +1131,23 @@ async def on_message(message):
                             strength = strength_float
                     except Exception:
                         pass
+                if 'width' in opts:
+                    try:
+                        width_int = int(opts['width'])
+                        if width_int in VALID_IMAGE_HEIGHT_WIDTH:
+                            width = width_int
+                    except Exception:
+                        pass
+            prompt = prompt[0:parens_idx]
 
         await _interpolate(message.channel, message.author,
             prompt.split('|')[0], prompt.split('|')[1],
+            height=height,
             sampler=sampler,
             scale=scale,
             seed=seed,
-            strength=strength)
+            strength=strength,
+            width=width)
         return
     if isinstance(message.clean_content, str) and \
         message.clean_content.startswith('>upscale '):
@@ -972,8 +1180,7 @@ async def on_message(message):
                 message.channel.send(f'Could not load image file for attachment {i}')
                 continue
 
-            # TODO Allow non-square image sizes
-            image = image.resize((512, 512)).convert('RGB')
+            image = resize_image(image).convert('RGB')
             image.save(image_fn, format='PNG')
 
             buffered = BytesIO()

@@ -29,6 +29,7 @@
 
 ## Changelog
 
+- 2022-09-06: Added the ability to change make images of any size and riff into different sizes ("outriffing").
 - 2022-09-05: The `sd-lite` branch has been merged upstream, so now low VRAM is available with docker images too.
 - 2022-08-30: `optimized-sd` branch has moved to `sd-lite` branch, which will be merged upstream. Includes small bugfixes and enhanced interpolation. Upstream docker image is now functional, so instructions have been added for installing that.
 - 2022-08-30: Updated to add slash commands in addition to legacy commands, added a manual link instead of help, added multi-user support (more than one user may now use the bot at a time without waiting), added `interpolate` command.

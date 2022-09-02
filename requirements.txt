@@ -4,3 +4,4 @@ Pillow
 aiohttp
 docarray
 jina
+numpy

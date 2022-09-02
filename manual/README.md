@@ -15,6 +15,13 @@ For all commands that use indexes, the indexes are stored from left to right per
 |~~~~~|
 ```
 
+- [Text-to-image](#text-to-image)
+- [Riff (Diffusion)](#riff-diffusion)
+- [image2image](#image2image)
+- [Interpolate](#riff-diffusion)
+- [Upload images](#upload-images)
+- [Upscale](#upscale)
+
 ### Text-to-image
 - `/image <prompt>` (slash command)
 - `/image <prompt [variation 1, variation 2, ...]>` (slash command)
@@ -24,15 +31,17 @@ For all commands that use indexes, the indexes are stored from left to right per
 Generate an image from a text prompt. Images may be given variations with an array format by enclosing values in square brackets e.g. "a [red, blue, green, purple] ball".
 
 Options:
+- `height`: The height of the output in pixels. Min 384, max 768, steps in 64.
 - `sampler`: Which sampler to use when creating the image. Some samplers, such as `euler`, may require fewer steps to get good results, while others can have [a dramatic effect](https://i.redd.it/uy2fp799wmj91.jpg) on image generation itself. Defaults to `k_lms`.
 - `scale`: Conditioning scale for prompt (1.0 to 50.0). This is how strongly the prompt conditions the image. Very high scales may induce a saturation like effect. Default 7.5.
 - `seed`: Deterministic seed integer used to generate your images. The seed defines the noise that will be used to generate your image, and will cause reproducible results when reusing seeds. For example, all prompt array iterations use a fixed seed to make all images appear similar to one another.  Default random integer.
 - `seed_search`: When set, a total of 9 images are made by scanning all seeds from `seed` to `seed + 9`. If no seed is set, the default seed `1` is used.
+- `width`: The width of the output in pixels. Min 384, max 768, steps in 64.
 
 ### image2image
 - `>image2image prompt (foo=bar)` (direct message command)
 
-Diffuse an image that was uploaded with this message. Only works as a direct message command because Discord does not yet allow files to be uploaded with slash commands. As of now, **the images are resized to 512x512 pixels before storing, so using images with a 1:1 aspect ratio will have a better result**. In the future the ability to alter the size of the images generated will be added, and images will be stored in their approximate aspect ratios.
+Diffuse an image that was uploaded with this message. Only works as a direct message command because Discord does not yet allow files to be uploaded with slash commands.
 
 Options: Same as for Riff (Diffusion) below.
 
@@ -45,13 +54,15 @@ Diffuse an image that was generated in the past or which was uploaded to the bot
 Riff buttons using the feature with default settings are automatically added to all `riff` or `image` commands.
 
 Options:
-- `iterations`: The number of times to re-diffuse before generating the final four images. The more iterations, the strong the effect. Default is `1` or no extra iterations.
+- `height`: The height of the output in pixels. Min 384, max 768, steps in 64.
+- `iterations`: The number of times to re-diffuse before generating the final four images. The more iterations, the strong the effect. Default is `1` or no extra iterations. Note that iterations are **ignored** when riffing one aspect ratio to another.
 - `latentless`: Use a random latent to generate the image, meaning that the prior image is not used at all. May be used to test a prompt without the image while using the same parameters.
 - `prompt`: Prompt the override the prompt saved in the DocArray.
 - `sampler`: Which sampler to use when creating the image. Some samplers, such as `euler`, may require fewer steps to get good results, while others can have [a dramatic effect](https://i.redd.it/uy2fp799wmj91.jpg) on image generation itself. Defaults to `k_lms`.
 - `scale`: Conditioning scale for prompt (1.0 to 50.0). This is how strongly the prompt conditions the image. Very high scales may induce a saturation like effect. Default 7.5.
 - `seed`: Deterministic seed integer used to generate your images. The seed defines the noise that will be used to generate your image, and will cause reproducible results when reusing seeds. Default random integer.
-- `strength`: Strength of conditioning (0.01 <= strength <= 0.99). Used to determine how strongly to diffuse the image against the previous state. A strength of 0.99 should effectively eliminate the previous image, while a strength of 0.01 should do almost nothing. Default 0.75.
+- `strength`: Strength of conditioning (0.01 <= strength <= 0.99). Used to determine how strongly to diffuse the image against the previous state. A strength of 0.99 should effectively eliminate the previous image, while a strength of 0.01 should do almost nothing. Default 0.75. Note that strength is **ignored** when riffing one aspect ratio to another.
+- `width`: The width of the output in pixels. Min 384, max 768, steps in 64.
 
 ### Interpolate
 - `/interpolate <prompt 1> <prompt 2>` (slash command)
@@ -59,24 +70,26 @@ Options:
 
 This generates a series of 9 images that start with one prompt and end with another prompt while attempting to sample all the space inbetween. The first image is generated through the same sampling pipeline as text-to-image, while the subsequent images are riffed through this while the latent embeddings are spherically interpolated between the two prompts to produce mid-state images.
 
+- `height`: The height of the output in pixels. Min 384, max 768, steps in 64.
 - `prompt 1`: Prompt to start the interpolation from.
 - `prompt 2`: Prompt to interpolate to.
 - `sampler`: Which sampler to use when creating the image. Some samplers, such as `euler`, may require fewer steps to get good results, while others can have [a dramatic effect](https://i.redd.it/uy2fp799wmj91.jpg) on image generation itself. Defaults to `k_lms`.
 - `scale`: Conditioning scale for prompt (1.0 to 50.0). This is how strongly the prompt conditions the image. Very high scales may induce a saturation like effect.  Default 7.5.
 - `seed`: Deterministic seed integer used to generate your images. The seed defines the noise that will be used to generate your image, and will cause reproducible results when reusing seeds. Default random integer.
 - `strength`: Strength of conditioning (0.01 <= strength <= 0.99). Used to determine how strongly to diffuse the image against the previous state. Higher strengths should yield more intense interpolations. Default 0.75.
+- `width`: The width of the output in pixels. Min 384, max 768, steps in 64.
 
 ### Upload Images
 - `@bot_name <description>` (direct message command)
 
-Simply tagging the bot with a message starting with `@bot_name` where `bot_name` is the name of your bot while attaching one or more images will upload all the images to the bot and yield IDs for them to use in `riff`, `upscale`, etc. As of now, **the images are resized to 512x512 pixels before storing, so using images with a 1:1 aspect ratio will have a better result**. In the future the ability to alter the size of the images generated will be added, and images will be stored in their approximate aspect ratios.
+Simply tagging the bot with a message starting with `@bot_name` where `bot_name` is the name of your bot while attaching one or more images will upload all the images to the bot and yield IDs for them to use in `riff`, `upscale`, etc.
 
 ### Upscale
 
 - `/upscale <docarray_id> <index>` (slash command)
 - `>upscale <docarray_id> <index>` (direct message command)
 
-Upscale an image to 4x the resolution (512x512 -> 1024x1024).
+Upscale an image to 4x the resolution (512x512 -> 2048x2048).
 
 Upscale buttons using the feature are automatically added to all `riff` or `image` commands.
 
