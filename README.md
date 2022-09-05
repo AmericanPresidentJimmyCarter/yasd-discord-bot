@@ -221,7 +221,7 @@ Need to download the weights? Go to [Huggingface's repository for the latest ver
 To start jina with old models disabled when you're all done:
 
 ```bash
-python flow_parser.py --enable-stable-diffusion-lite --disable-dalle-mega --disable-glid3xl
+python flow_parser.py --enable-stable-diffusion --disable-dalle-mega --disable-glid3xl
 jina flow --uses flow.tmp.yml
 ```
 
@@ -232,7 +232,7 @@ jina flow --uses flow.tmp.yml
 Run this instead to disable the SWINIR, which will crash your GPU. the `>upscale` endpoint will not be available.
 
 ```bash
-python flow_parser.py --enable-stable-diffusion --disable-dalle-mega --disable-glid3xl --disable-swinir
+python flow_parser.py --enable-stable-diffusion-lite --disable-dalle-mega --disable-glid3xl --disable-swinir
 jina flow --uses flow.tmp.yml
 ```
 
