@@ -6,7 +6,7 @@
 
 - **Highly Scalable**: Leverages `dalle-flow` gRPC interface to independently serve images from any number of GPUs, while higher memory calls to the gRPC through the bot are forked onto individual instances of Python.
 - **Support For Other Popular Models**: Latent diffusion GLID3XL or DALLE-MEGA can easily by turned on in addition to Stable Diffusion through `dalle-flow` for text-to-image generation.
-- **Support For Low VRAM GPUS**: Locally maintained branch `sd-lite` of `dalle-flow` supports image generation with GPUs >= 5 GB.
+- **Support For Low VRAM GPUS**: Stable Diffusion Lite supports image generation with GPUs >= 5 GB.
 - **Supports Slash and Legacy Style Commands**: While Discord is moving towards the new slash style commands that feature auto-completion functions, YASD Discord Bot also features direct commands prefixed with `>` -- whichever you find easier.
 - **Easy User Interface Including Buttons and Loading Indicators**: Riffing and upscaling your creations has never been easier! It even comes with a [manual](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme)!
 - **Stores All Images and Prompts by Default**: Never lose your previous generations!
@@ -29,6 +29,7 @@
 
 ## Changelog
 
+- 2022-09-05: The `sd-lite` branch has been merged upstream, so now low VRAM is available with docker images too.
 - 2022-08-30: `optimized-sd` branch has moved to `sd-lite` branch, which will be merged upstream. Includes small bugfixes and enhanced interpolation. Upstream docker image is now functional, so instructions have been added for installing that.
 - 2022-08-30: Updated to add slash commands in addition to legacy commands, added a manual link instead of help, added multi-user support (more than one user may now use the bot at a time without waiting), added `interpolate` command.
 - 2022-08-28: Add ability to use with low VRAM cards through optimized `dalle-flow` branch `optimized-sd`.
@@ -48,11 +49,11 @@ Python 3 3.9+ with pip and virtualenv installed (Ubuntu 22.04 works great!)
 
 CUDA runtime environment installed
 
-An NVIDIA GPU with >= 16 GB of VRAM (docker or native installation)
+An NVIDIA GPU with >= 16 GB of VRAM (9GB if you disable SwinIR)
 
 OR
 
-An NVIDIA GPU with >= 5 GB of VRAM using the `dalle-flow` `sd-lite` branch (no docker option, follow [Native installation](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot#native-installation) below carefully)
+An NVIDIA GPU with >= 5 GB of VRAM using the lite option
 
 If running with a low VRAM GPU, you will not have access to the `>upscale` endpoint and will not have the ability to use multiple samplers. Pay close attention to all steps labeled **LOW VRAM GPU USERS** in the installation instructions.
 
@@ -101,6 +102,30 @@ sudo docker run -e DISABLE_CLIP="1" \
   jinaai/dalle-flow
 ```
 
+***
+
+**LOW VRAM GPU USERS**
+
+Run this instead to enable the lite version and disable the SWINIR, which will crash your GPU. the `>upscale` endpoint will not be available.
+
+```bash
+sudo docker run -e DISABLE_CLIP="1" \
+  -e DISABLE_DALLE_MEGA="1" \
+  -e DISABLE_GLID3XL="1" \
+  -e DISABLE_SWINIR="1" \
+  -e ENABLE_STABLE_DIFFUSION_LITE="1" \
+  -p 51005:51005 \
+  -it \
+  -v ~/ldm:/dalle/stable-diffusion/models/ldm/ \
+  -v $HOME/.cache:/home/dalle/.cache \
+  --gpus all \
+  jinaai/dalle-flow
+```
+
+If you have >= 12 GB of VRAM, you can re-enable SWINIR.
+
+***
+
 Somewhere else, clone this repository and follow these steps:
 
 ```bash
@@ -116,6 +141,8 @@ Then you can start the bot with:
 ```bash
 python bot.py YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
 ```
+
+**LOW VRAM GPU USERS**: You can disable the other samplers showing up, which do nothing, by adding the flag `--optimized-sd` to the above command.
 
 **Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
 
@@ -168,6 +195,30 @@ sudo docker run -e DISABLE_CLIP="1" \
   jinaai/dalle-flow
 ```
 
+***
+
+**LOW VRAM GPU USERS**
+
+Run this instead to enable the lite version and disable the SWINIR, which will crash your GPU. the `>upscale` endpoint will not be available.
+
+```bash
+sudo docker run -e DISABLE_CLIP="1" \
+  -e DISABLE_DALLE_MEGA="1" \
+  -e DISABLE_GLID3XL="1" \
+  -e DISABLE_SWINIR="1" \
+  -e ENABLE_STABLE_DIFFUSION_LITE="1" \
+  -p 51005:51005 \
+  -it \
+  -v ~/ldm:/dalle/stable-diffusion/models/ldm/ \
+  -v $HOME/.cache:/home/dalle/.cache \
+  --gpus all \
+  jinaai/dalle-flow
+```
+
+If you have >= 12 GB of VRAM, you can re-enable SWINIR.
+
+***
+
 Somewhere else, clone this repository and follow these steps:
 
 ```bash
@@ -184,6 +235,8 @@ Then you can start the bot with:
 python bot.py YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
 ```
 
+**LOW VRAM GPU USERS**: You can disable the other samplers showing up, which do nothing, by adding the flag `--optimized-sd` to the above command.
+
 **Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
 
 Where YOUR_DISCORD_BOT_TOKEN is your [token](https://discordpy.readthedocs.io/en/stable/discord.html) and YOUR_GUILD_ID is the integer ID for your server (right click on the server name, then click "Copy ID"). Supplying the guild ID is optional, but it will result in the slash commands being available to your server almost instantly. Once the bot is connected, you can read about how to use it with `>help`.
@@ -195,24 +248,6 @@ OPTIONAL: If you aren't running jina on the same box, you will need change the a
 ### Native installation
 
 Follow the instructions for [dalle-flow](https://github.com/jina-ai/dalle-flow) to install and run that server. The steps you need to follow can be found under "**Run natively**". Once `flow` is up and running, proceed to the next step.
-
-***
-
-**LOW VRAM GPU USERS**
-
-In the instructions for [dalle-flow](https://github.com/jina-ai/dalle-flow), use the following instead of the **Clone repos** step:
-
-```bash
-mkdir dalle && cd dalle
-git clone --single-branch --branch sd-lite https://github.com/AmericanPresidentJimmyCarter/dalle-flow/
-git clone https://github.com/jina-ai/SwinIR
-git clone https://github.com/CompVis/stable-diffusion
-git clone https://github.com/CompVis/latent-diffusion
-git clone https://github.com/jina-ai/glid-3-xl
-
-```
-
-***
 
 At this time, if you haven't already, you will need to put the stable diffusion weights into `dalle/stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt`.
 
@@ -232,7 +267,7 @@ jina flow --uses flow.tmp.yml
 Run this instead to disable the SWINIR, which will crash your GPU. the `>upscale` endpoint will not be available.
 
 ```bash
-python flow_parser.py --enable-stable-diffusion-lite --disable-dalle-mega --disable-glid3xl --disable-swinir
+python flow_parser.py --disable-clip --enable-stable-diffusion-lite --disable-dalle-mega --disable-glid3xl --disable-swinir
 jina flow --uses flow.tmp.yml
 ```
 
