@@ -19,7 +19,7 @@
 - [Installation](#installation)
   - [Docker Image](#docker-installation-docker-image)
   - [Docker Self-Build](#docker-installation-build-docker-image-yourself)
-  - [Native (Low VRAM)](#native-installation)
+  - [Native](#native-installation)
 - [What can it do?](#what-can-it-do)
 - [User Manual](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme)
 - [Something is broken](#something-is-broken)
