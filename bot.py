@@ -27,6 +27,7 @@ parser.add_argument('--optimized-sd', dest='optimized_sd',
     action=argparse.BooleanOptionalAction)
 parser.add_argument('--allow-queue', dest='allow_queue',
     action=argparse.BooleanOptionalAction)
+parser.add_argument('--default-steps', dest='default_steps', nargs='?', type=int, default=50)
 args = parser.parse_args()
 guild = args.guild
 
@@ -378,7 +379,7 @@ async def _image(
     scale: Optional[float]=None,
     seed: Optional[int]=None,
     seed_search: bool=None,
-    steps: Optional[int]=12,
+    steps: Optional[int]=args.default_steps,
     width: Optional[int]=None,
 ):
     global currently_fetching_ai_image
