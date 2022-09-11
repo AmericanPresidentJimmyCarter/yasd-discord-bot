@@ -21,17 +21,21 @@ from docarray import Document, DocumentArray
 
 parser = argparse.ArgumentParser()
 parser.add_argument('token', help='Discord token')
+parser.add_argument('--allow-queue', dest='allow_queue',
+    action=argparse.BooleanOptionalAction)
+parser.add_argument('--default-steps', dest='default_steps', nargs='?',
+    type=int, help='Default number of steps for the sampler', default=50)
 parser.add_argument('-g', '--guild', help='Discord guild ID', type=int,
     required=False)
 parser.add_argument('--optimized-sd', dest='optimized_sd',
     action=argparse.BooleanOptionalAction)
-parser.add_argument('--allow-queue', dest='allow_queue',
-    action=argparse.BooleanOptionalAction)
-parser.add_argument('--default-steps', dest='default_steps', nargs='?', type=int, default=50)
 args = parser.parse_args()
+
 guild = args.guild
 
+# In memory k-v stores.
 currently_fetching_ai_image: dict[str, Union[str, bool]] = {}
+user_image_generation_nonces: dict[str, int] = {}
 
 BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY = 'four_img_views'
 button_store_dict: dict[str, list] = { BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY: [] }
@@ -39,8 +43,8 @@ button_store_dict: dict[str, list] = { BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY: [] 
 MANUAL_LINK = 'https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme'
 ID_LENGTH = 12
 BUTTON_STORE = f'temp_json/button-store-{str(guild)}.json'
-JSON_IMAGE_TOOL_INPUT_FILE_FN = lambda uid: f'temp_json/request-{uid}.json'
-JSON_IMAGE_TOOL_OUTPUT_FILE_FN = lambda uid: f'temp_json/output-{uid}.json'
+JSON_IMAGE_TOOL_INPUT_FILE_FN = lambda uid, nonce: f'temp_json/request-{uid}_{nonce}.json'
+JSON_IMAGE_TOOL_OUTPUT_FILE_FN = lambda uid, nonce: f'temp_json/output-{uid}_{nonce}.json'
 MIN_ITERATIONS = 1
 MAX_ITERATIONS = 16
 MIN_SCALE = 1.0
@@ -131,6 +135,15 @@ def resize_image(image):
 def document_to_pil(doc):
     uri_data = urlopen(doc.uri)
     return Image.open(BytesIO(uri_data.read()))
+
+
+def bump_nonce_and_return(user_id: str):
+    global user_image_generation_nonces
+    if user_image_generation_nonces.get(user_id, None) is None:
+        user_image_generation_nonces[user_id] = 0
+    else:
+        user_image_generation_nonces[user_id] += 1
+    return user_image_generation_nonces[user_id]
 
 
 intents = discord.Intents(
@@ -385,7 +398,8 @@ async def _image(
     global currently_fetching_ai_image
     author_id = str(user.id)
 
-    if steps == None: steps = 15
+    if steps is None:
+        steps = args.default_steps
 
     short_id = None
     typ = 'prompt'
@@ -413,15 +427,16 @@ async def _image(
             'type': typ,
             'width': width,
         }
-        with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id), 'w') as inp:
+        nonce = bump_nonce_and_return(author_id)
+        with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id, nonce), 'w') as inp:
             inp.write(json.dumps(req))
         proc = await asyncio.create_subprocess_exec(
-            'python','imagetool.py', author_id,
+            'python','imagetool.py', f'{author_id}_{nonce}',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE)
         await proc.communicate()
         output = None
-        with open(JSON_IMAGE_TOOL_OUTPUT_FILE_FN(author_id), 'r') as out:
+        with open(JSON_IMAGE_TOOL_OUTPUT_FILE_FN(author_id, nonce), 'r') as out:
             output = json.load(out)
 
         err = output.get('error', None)
@@ -548,15 +563,16 @@ async def _riff(
             'type': 'riff',
             'width': width,
         }
-        with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id), 'w') as inp:
+        nonce = bump_nonce_and_return(author_id)
+        with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id, nonce), 'w') as inp:
             inp.write(json.dumps(req))
         proc = await asyncio.create_subprocess_exec(
-            'python','imagetool.py', author_id,
+            'python','imagetool.py', f'{author_id}_{nonce}',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE)
         await proc.communicate()
         output = None
-        with open(JSON_IMAGE_TOOL_OUTPUT_FILE_FN(author_id), 'r') as out:
+        with open(JSON_IMAGE_TOOL_OUTPUT_FILE_FN(author_id, nonce), 'r') as out:
             output = json.load(out)
 
         err = output.get('error', None)
@@ -671,15 +687,16 @@ async def _interpolate(
             'type': 'interpolate',
             'width': width,
         }
-        with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id), 'w') as inp:
+        nonce = bump_nonce_and_return(author_id)
+        with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id, nonce), 'w') as inp:
             inp.write(json.dumps(req))
         proc = await asyncio.create_subprocess_exec(
-            'python','imagetool.py', author_id,
+            'python','imagetool.py', f'{author_id}_{nonce}',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE)
         await proc.communicate()
         output = None
-        with open(JSON_IMAGE_TOOL_OUTPUT_FILE_FN(author_id), 'r') as out:
+        with open(JSON_IMAGE_TOOL_OUTPUT_FILE_FN(author_id, nonce), 'r') as out:
             output = json.load(out)
 
         err = output.get('error', None)
@@ -767,15 +784,16 @@ async def _upscale(
             'index': idx,
             'type': 'upscale',
         }
-        with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id), 'w') as inp:
+        nonce = bump_nonce_and_return(author_id)
+        with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id, nonce), 'w') as inp:
             inp.write(json.dumps(req))
         proc = await asyncio.create_subprocess_exec(
-            'python','imagetool.py', author_id,
+            'python','imagetool.py', f'{author_id}_{nonce}',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE)
         await proc.communicate()
         output = None
-        with open(JSON_IMAGE_TOOL_OUTPUT_FILE_FN(author_id), 'r') as out:
+        with open(JSON_IMAGE_TOOL_OUTPUT_FILE_FN(author_id, nonce), 'r') as out:
             output = json.load(out)
 
         err = output.get('error', None)

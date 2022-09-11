@@ -96,6 +96,17 @@ Upscale buttons using the feature are automatically added to all `riff` or `imag
 
 ## Administrator-level Configurations
 
+### Bot arguments
+
+- `-g` or `--guild`: Discord guild/server ID to send your slash commands to. If not specified, it may take up to an hour for your slash commands to show up.
+
+- `--allow-queue`: If this is true, the users are allowed to make any quantity of images for themselves at the same time. By default, users are restricted to one image at a time.
+
+- `--default-steps`: The default number of steps to use on `/image` or `>image`.
+
+- `--optimized-sd`: Whether or not to hide sampler or other options not available to optimized SD.
+
+
 ### config.yml for Stable Diffusion Executor
 
 If you have installed the Native Installation, you can find a simple configuration file in `dalle/dalle-flow/executors/stable/config.yml`. Here you can alter the default number of samples to generate at the same time along with the resolution of the images generated.
