@@ -98,11 +98,17 @@ Upscale buttons using the feature are automatically added to all `riff` or `imag
 
 ### Bot arguments
 
-- `-g` or `--guild`: Discord guild/server ID to send your slash commands to. If not specified, it may take up to an hour for your slash commands to show up.
+To enable the NSFW filter to automatically add the spoiler tag to any potential NSFW images, use the flag ``.
+
+- `-g <guild_id>` or `--guild <guild_id>`: Discord guild/server ID to send your slash commands to. If not specified, it may take up to an hour for your slash commands to show up.
 
 - `--allow-queue`: If this is true, the users are allowed to make any quantity of images for themselves at the same time. By default, users are restricted to one image at a time.
 
-- `--default-steps`: The default number of steps to use on `/image` or `>image`.
+- `--default-steps <steps>`: The default number of steps to use on `/image` or `>image`.
+
+- `--nsfw-auto-spoiler`: Automatically add the spoiler tag to any potential NSFW images. Requires you to `pip install -r requirements_nsfw_filter.txt` first, as this requires torch.
+
+- `--nsfw-wordlist <wordlist>`:  Reject any prompts if they contain a word within a wordlist. The wordlist should be strings separated by newlines.
 
 - `--optimized-sd`: Whether or not to hide sampler or other options not available to optimized SD.
 

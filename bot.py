@@ -11,6 +11,8 @@ from typing import Any, Optional, Union
 from urllib.request import urlopen
 
 import discord
+import numpy as np
+import torch
 
 from PIL import Image
 from discord import app_commands
@@ -25,11 +27,39 @@ parser.add_argument('--allow-queue', dest='allow_queue',
     action=argparse.BooleanOptionalAction)
 parser.add_argument('--default-steps', dest='default_steps', nargs='?',
     type=int, help='Default number of steps for the sampler', default=50)
-parser.add_argument('-g', '--guild', help='Discord guild ID', type=int,
+parser.add_argument('-g', '--guild', dest='guild',
+    help='Discord guild ID', type=int, required=False)
+parser.add_argument('--nsfw-auto-spoiler', dest='auto_spoiler',
+    action=argparse.BooleanOptionalAction)
+parser.add_argument('--nsfw-wordlist',
+    dest='nsfw_wordlist',
+    help='Newline separated wordlist filename',
+    type=str,
     required=False)
 parser.add_argument('--optimized-sd', dest='optimized_sd',
     action=argparse.BooleanOptionalAction)
 args = parser.parse_args()
+
+# Load up diffusers NSFW detection model and the NSFW wordlist detector.
+nsfw_wordlist: list[str] = []
+safety_feature_extractor = None
+safety_checker = None
+if args.auto_spoiler:
+    from diffusers.pipelines.stable_diffusion.safety_checker import (
+        StableDiffusionSafetyChecker,
+    )
+    from transformers import AutoFeatureExtractor
+
+    # load safety model
+    SAFETY_MODEL_ID = "CompVis/stable-diffusion-safety-checker"
+    safety_feature_extractor = AutoFeatureExtractor.from_pretrained(
+        SAFETY_MODEL_ID)
+    safety_checker = StableDiffusionSafetyChecker.from_pretrained(
+        SAFETY_MODEL_ID)
+if args.nsfw_wordlist:
+    with open(args.nsfw_wordlist, 'r') as lst_f:
+        nsfw_wordlist = lst_f.readlines()
+        nsfw_wordlist = [word.strip().lower() for word in nsfw_wordlist]
 
 guild = args.guild
 
@@ -144,6 +174,45 @@ def bump_nonce_and_return(user_id: str):
     else:
         user_image_generation_nonces[user_id] += 1
     return user_image_generation_nonces[user_id]
+
+
+def img_to_tensor(img):
+    w, h = img.size
+    w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+    img = img.resize((w, h), resample=Image.LANCZOS)
+    img = np.array(img).astype(np.float32) / 255.0
+    img = img[None].transpose(0, 3, 1, 2)
+    img = torch.from_numpy(img)
+    return 2.*img - 1.
+
+
+def check_safety(img_loc):
+    try:
+        img = Image.open(img_loc).convert("RGB")
+        safety_checker_input = safety_feature_extractor(img,
+            return_tensors="pt")
+        _, has_nsfw_concept = safety_checker(
+            images=[img_to_tensor(img)],
+            clip_input=safety_checker_input.pixel_values)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+    return has_nsfw_concept[0]
+
+
+def prompt_contains_nsfw(prompt):
+    if prompt is None:
+        return False
+    if len(nsfw_wordlist) == 0:
+        return False
+    return any(word in prompt.lower() for word in nsfw_wordlist)
+
+
+def to_discord_file_and_maybe_check_safety(img_loc):
+    nsfw = False
+    if args.auto_spoiler:
+        nsfw = check_safety(img_loc)
+    return discord.File(img_loc, spoiler=nsfw)
 
 
 intents = discord.Intents(
@@ -411,6 +480,11 @@ async def _image(
     if seed_search:
         typ = 'promptsearch'
 
+    if args.nsfw_wordlist and prompt_contains_nsfw(prompt):
+        await channel.send('Sorry, this prompt contains a word in the NSFW ' +
+            'wordlist.')
+        return
+
     if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
@@ -448,7 +522,8 @@ async def _image(
         image_loc = output['image_loc']
         short_id = output['id']
         seeds = output.get('seeds', None)
-        file = discord.File(image_loc)
+
+        file = to_discord_file_and_maybe_check_safety(image_loc)
         if seed_search is True:
             await work_msg.edit(
                 content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
@@ -548,6 +623,12 @@ async def _riff(
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
         return
+
+    if args.nsfw_wordlist and prompt_contains_nsfw(prompt):
+        await channel.send('Sorry, this prompt contains a word in the NSFW ' +
+            'wordlist.')
+        return
+
     currently_fetching_ai_image[author_id] = f'riffs on previous work `{docarray_id}`, index {str(idx)}'
     work_msg = await channel.send(f'Now beginning work on "riff `{docarray_id}` index {str(idx)}" for <@{author_id}>. Please be patient until I finish that.')
     try:
@@ -584,7 +665,7 @@ async def _riff(
         image_loc = output['image_loc']
         short_id = output['id']
 
-        file = discord.File(image_loc)
+        file = to_discord_file_and_maybe_check_safety(image_loc)
         btns = FourImageButtons(message_id=work_msg.id, short_id=short_id)
         btns.serialize_to_json_and_store()
         client.add_view(btns, message_id=work_msg.id)
@@ -675,6 +756,12 @@ async def _interpolate(
             delete_after=5)
         return
 
+    if args.nsfw_wordlist and (prompt_contains_nsfw(prompt1) or
+        prompt_contains_nsfw(prompt2)):
+        await channel.send('Sorry, these prompts contains a word in the NSFW ' +
+            'wordlist.')
+        return
+
     short_id = None
     currently_fetching_ai_image[author_id] = f'interpolate on prompt {prompt1} to {prompt2}'
     work_msg = await channel.send(f'Now beginning work on "interpolate `{prompt1}` to `{prompt2}`" for <@{author_id}>. Please be patient until I finish that.')
@@ -708,7 +795,7 @@ async def _interpolate(
         image_loc = output['image_loc']
         short_id = output['id']
 
-        file = discord.File(image_loc)
+        file = to_discord_file_and_maybe_check_safety(image_loc)
         await work_msg.edit(
             content=f'Image generation for interpolate on `{prompt1}` to `{prompt2}` for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
             attachments=[file])
@@ -805,7 +892,7 @@ async def _upscale(
             raise Exception(err)
         image_loc = output['image_loc']
 
-        file = discord.File(image_loc)
+        file = to_discord_file_and_maybe_check_safety(image_loc)
         await work_msg.edit(
             content=f'Image generation for upscale on `{docarray_id}` index {str(idx)} for <@{author_id}> complete.',
             attachments=[file])

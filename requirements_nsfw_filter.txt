@@ -1,0 +1,10 @@
+PyNaCl
+discord.py
+Pillow
+aiohttp
+docarray
+jina
+numpy
+diffusers
+torch
+transformers

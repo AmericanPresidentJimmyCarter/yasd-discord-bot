@@ -29,6 +29,7 @@
 
 ## Changelog
 
+- 2022-09-11: Add optional NSFW spoiler filter and NSFW wordlist filter. Added the ability to set default steps and queue any quantity of images on a per user basis with a new flag.
 - 2022-09-06: Added the ability to change make images of any size and riff into different sizes ("outriffing").
 - 2022-09-05: The `sd-lite` branch has been merged upstream, so now low VRAM is available with docker images too.
 - 2022-08-30: `optimized-sd` branch has moved to `sd-lite` branch, which will be merged upstream. Includes small bugfixes and enhanced interpolation. Upstream docker image is now functional, so instructions have been added for installing that.
@@ -41,7 +42,11 @@
 
 ## Content advisory
 
-This bot does not come equipped with a NSFW filter for content and will make any content out of the box. Please be sure to read and agree with the [license for the weights](https://github.com/CompVis/stable-diffusion/blob/main/LICENSE), as well as the [MIT license](https://en.wikipedia.org/wiki/MIT_License), and abide by all applicable laws and regulations in your respective area.
+This bot does not come equipped with a NSFW filter for content by default and will make any content out of the box. Please be sure to read and agree with the [license for the weights](https://github.com/CompVis/stable-diffusion/blob/main/LICENSE), as well as the [MIT license](https://en.wikipedia.org/wiki/MIT_License), and abide by all applicable laws and regulations in your respective area.
+
+To enable the NSFW filter to automatically add the spoiler tag to any potential NSFW images, use the flag `--nsfw-auto-spoiler`. You must first `pip install -r requirements_nsfw_filter.txt` to get the modules required for this.
+
+To reject any prompts if they contain a word within a wordlist, use the `--nsfw-wordlist` flag, e.g. `--nsfw-wordlist bad_words.txt`. The wordlist should be strings separated by newlines.
 
 
 ## What do I need?
