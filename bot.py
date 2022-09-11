@@ -38,6 +38,10 @@ parser.add_argument('--nsfw-wordlist',
     required=False)
 parser.add_argument('--optimized-sd', dest='optimized_sd',
     action=argparse.BooleanOptionalAction)
+parser.add_argument('--restrict-slash-to-channel',
+    dest='restrict_slash_to_channel',
+    help='Restrict slash commands to a specific channel',
+    type=int, required=False)
 args = parser.parse_args()
 
 # Load up diffusers NSFW detection model and the NSFW wordlist detector.
@@ -584,6 +588,12 @@ async def image(
     width: Optional[app_commands.Choice[int]] = None,
 ):
     await interaction.response.defer(thinking=True)
+
+    if args.restrict_slash_to_channel:
+        if interaction.channel.id != args.restrict_slash_to_channel:
+            await interaction.followup.send('You are not allowed to use this in this channel!')
+            return
+
     sid = await _image(interaction.channel, interaction.user, prompt,
         height=height.value if height is not None else None,
         sampler=sampler.value if sampler is not None else None,
@@ -719,6 +729,12 @@ async def riff(
     width: Optional[app_commands.Choice[int]] = None,
 ):
     await interaction.response.defer(thinking=True)
+
+    if args.restrict_slash_to_channel:
+        if interaction.channel.id != args.restrict_slash_to_channel:
+            await interaction.followup.send('You are not allowed to use this in this channel!')
+            return
+
     sid = await _riff(interaction.channel, interaction.user, docarray_id, idx,
         height=height.value if height is not None else None,
         iterations=iterations,
@@ -838,6 +854,12 @@ async def interpolate(
     width: Optional[app_commands.Choice[int]] = None,
 ):
     await interaction.response.defer(thinking=True)
+
+    if args.restrict_slash_to_channel:
+        if interaction.channel.id != args.restrict_slash_to_channel:
+            await interaction.followup.send('You are not allowed to use this in this channel!')
+            return
+
     sid = await _interpolate(interaction.channel, interaction.user, prompt1, prompt2,
         height=height.value if height is not None else None,
         sampler=sampler.value if sampler is not None else None,
@@ -918,6 +940,12 @@ async def upscale(
     idx: app_commands.Range[int, 0, NUM_IMAGES_MAX-1],
 ):
     await interaction.response.defer(thinking=True)
+
+    if args.restrict_slash_to_channel:
+        if interaction.channel.id != args.restrict_slash_to_channel:
+            await interaction.followup.send('You are not allowed to use this in this channel!')
+            return
+
     await _upscale(interaction.channel, interaction.user, docarray_id, idx)
     await interaction.followup.send('Done!')
 

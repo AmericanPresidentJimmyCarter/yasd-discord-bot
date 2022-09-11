@@ -112,6 +112,8 @@ To enable the NSFW filter to automatically add the spoiler tag to any potential 
 
 - `--optimized-sd`: Whether or not to hide sampler or other options not available to optimized SD.
 
+- `--restrict-slash-to-channel <channel_id>`: Discord channel ID to restrict your slash commands to.
+
 
 ### config.yml for Stable Diffusion Executor
 
