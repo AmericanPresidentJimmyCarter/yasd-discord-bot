@@ -25,6 +25,8 @@ parser.add_argument('-g', '--guild', help='Discord guild ID', type=int,
     required=False)
 parser.add_argument('--optimized-sd', dest='optimized_sd',
     action=argparse.BooleanOptionalAction)
+parser.add_argument('--allow-queue', dest='allow_queue',
+    action=argparse.BooleanOptionalAction)
 args = parser.parse_args()
 guild = args.guild
 
@@ -231,9 +233,11 @@ class FourImageButtons(discord.ui.View):
         return fib
 
     async def global_shows_in_use(self, interaction: discord.Interaction):
+        if args.allow_queue: return False
+
         global currently_fetching_ai_image
         author_id = str(interaction.user.id)
-        if currently_fetching_ai_image.get(author_id, False):
+        if not args.allow_queue and currently_fetching_ai_image.get(author_id, False):
             await interaction.channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
             await interaction.response.defer()
@@ -374,11 +378,13 @@ async def _image(
     scale: Optional[float]=None,
     seed: Optional[int]=None,
     seed_search: bool=None,
-    steps: Optional[int]=None,
+    steps: Optional[int]=12,
     width: Optional[int]=None,
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
+
+    if steps == None: steps = 15
 
     short_id = None
     typ = 'prompt'
@@ -387,7 +393,7 @@ async def _image(
     if seed_search:
         typ = 'promptsearch'
 
-    if currently_fetching_ai_image.get(author_id, False) is not False:
+    if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
         return
@@ -519,7 +525,7 @@ async def _riff(
     author_id = str(user.id)
 
     short_id = None
-    if currently_fetching_ai_image.get(author_id, False) is not False:
+    if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
         return
@@ -644,7 +650,7 @@ async def _interpolate(
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
-    if currently_fetching_ai_image.get(author_id, False) is not False:
+    if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
         return
@@ -746,7 +752,7 @@ async def _upscale(
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
-    if currently_fetching_ai_image.get(author_id, False) is not False:
+    if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
         return
