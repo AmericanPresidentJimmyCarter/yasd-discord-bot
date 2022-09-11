@@ -272,10 +272,13 @@ class FourImageButtons(discord.ui.View):
         button: discord.ui.Button,
         idx: int,
     ):
-        button.disabled = True
-        await interaction.message.edit(view=self)
         await interaction.response.defer()
-        await _upscale(interaction.channel, interaction.user, self.short_id, idx)
+        completed = await _upscale(interaction.channel, interaction.user,
+            self.short_id, idx)
+
+        if completed:
+            button.disabled = True
+            await interaction.message.edit(view=self)
 
     @discord.ui.button(label="Riff 0", style=discord.ButtonStyle.blurple, row=0,
         custom_id=f'{short_id_generator()}-riff-0')
@@ -777,6 +780,7 @@ async def _upscale(
 
     currently_fetching_ai_image[author_id] = f'upscale on previous work `{docarray_id}`, index {str(idx)}'
     work_msg = await channel.send(f'Now beginning work on "upscale `{docarray_id}` index {str(idx)}" for <@{author_id}>. Please be patient until I finish that.')
+    completed = False
     try:
         # Make the request in the filesystem pipeline
         req = {
@@ -805,10 +809,13 @@ async def _upscale(
         await work_msg.edit(
             content=f'Image generation for upscale on `{docarray_id}` index {str(idx)} for <@{author_id}> complete.',
             attachments=[file])
+        completed = True
     except Exception as e:
         await channel.send(f'Got unknown error on upscale "{docarray_id}" index {str(idx)}: {str(e)}')
     finally:
         currently_fetching_ai_image[author_id] = False
+
+    return completed
 
 
 @client.tree.command(
