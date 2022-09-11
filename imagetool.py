@@ -1,6 +1,7 @@
 import argparse
 import json
 import numpy as np
+import os
 import random
 import string
 import traceback
@@ -12,8 +13,10 @@ from urllib.request import urlopen
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 from docarray import Document, DocumentArray
 
-# You may need to change this.
-JINA_SERVER_URL = 'grpc://127.0.0.1:51005'
+# You may need to set this environmental variable.
+ENV_SERVER_URL = 'DALLE_FLOW_SERVER'
+JINA_SERVER_URL = os.environ.get(ENV_SERVER_URL, False) or \
+    'grpc://127.0.0.1:51005'
 ID_LENGTH = 12
 
 parser = argparse.ArgumentParser()
