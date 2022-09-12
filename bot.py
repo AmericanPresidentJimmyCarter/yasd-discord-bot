@@ -1,9 +1,11 @@
 import argparse
 import asyncio
 import json
+import os
 import pathlib
 import random
 import string
+import sys
 import time
 
 from io import BytesIO
@@ -19,6 +21,16 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, View
 from docarray import Document, DocumentArray
+
+SELF_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SELF_DIR))
+
+from serializers import (
+    serialize_image_request,
+    serialize_interpolate_request,
+    serialize_riff_request,
+    serialize_upscale_request,
+)
 
 
 parser = argparse.ArgumentParser()
@@ -50,6 +62,7 @@ parser.add_argument('--restrict-slash-to-channel',
     help='Restrict slash commands to a specific channel',
     type=int, required=False)
 args = parser.parse_args()
+
 
 # Load up diffusers NSFW detection model and the NSFW wordlist detector.
 nsfw_toxic_detection_fn = None
@@ -477,6 +490,21 @@ class FourImageButtons(discord.ui.View):
         await interaction.response.defer()
 
 
+async def send_alert_embed(
+    channel: discord.abc.GuildChannel,
+    author_id: str,
+    work_msg: discord.Message,
+    serialized_cmd: str,
+):
+    guild_id = str(channel.guild.id)
+    channel_id = str(channel.id)
+    completed_id = str(work_msg.id)
+    embed = discord.Embed()
+    embed.description = f'Your request has finished. [Please view it here](https://discord.com/channels/{guild_id}/{channel_id}/{completed_id}).'
+    embed.add_field(name="Command Executed", value=serialized_cmd, inline=False)
+    embed.set_thumbnail(url=work_msg.attachments[0].url)
+    await channel.send(f'Job completed for <@{author_id}>.', embed=embed)
+
 
 async def _image(
     channel: discord.abc.GuildChannel,
@@ -556,25 +584,38 @@ async def _image(
 
         file = to_discord_file_and_maybe_check_safety(image_loc)
         if seed_search is True:
-            await work_msg.edit(
-                content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
+            seed_lst = []
+            for i, _s in enumerate(seeds):
+                seed_lst.append(f'{i}: {_s}')
+            seeds_str = ', '.join(seed_lst)
+
+            work_msg = await work_msg.edit(
+                content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`. Seeds used were {seeds_str}',
+                attachments=[file])
+        elif typ == 'promptarray':
+            work_msg = await work_msg.edit(
+                content=f'Image generation for prompt array "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
                 attachments=[file])
         else:
             btns = FourImageButtons(message_id=work_msg.id, short_id=short_id)
             btns.serialize_to_json_and_store()
             client.add_view(btns, message_id=work_msg.id)
-            await work_msg.edit(
+            work_msg = await work_msg.edit(
                 content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
                 attachments=[file],
                 view=btns)
-        if seed_search is True:
-            await channel.send(short_id)
-        if seeds is not None:
-            seed_lst = []
-            for i, _s in enumerate(seeds):
-                seed_lst.append(f'{i}: {_s}')
-            seeds_str = ', '.join(seed_lst)
-            await channel.send(f'Seeds used were {seeds_str}')
+
+        serialized_cmd = serialize_image_request(
+            prompt=prompt,
+            height=height,
+            sampler=sampler,
+            scale=scale,
+            seed=seed,
+            seed_search=seed_search,
+            steps=steps,
+            width=width)
+        await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
+
     except Exception as e:
         await channel.send(f'Got unknown error on prompt "{prompt}": {str(e)}')
     finally:
@@ -712,10 +753,24 @@ async def _riff(
         btns = FourImageButtons(message_id=work_msg.id, short_id=short_id)
         btns.serialize_to_json_and_store()
         client.add_view(btns, message_id=work_msg.id)
-        await work_msg.edit(
+        work_msg = await work_msg.edit(
             content=f'Image generation for riff on `{docarray_id}` index {str(idx)} for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
             attachments=[file],
             view=btns)
+
+        serialized_cmd = serialize_riff_request(
+            docarray_id=docarray_id,
+            idx=idx,
+            height=height,
+            iterations=iterations,
+            latentless=latentless,
+            prompt=prompt,
+            sampler=sampler,
+            scale=scale,
+            seed=seed,
+            strength=strength,
+            width=width)
+        await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
     except Exception as e:
         await channel.send(f'Got unknown error on riff "{docarray_id}" index {str(idx)}: {str(e)}')
     finally:
@@ -800,6 +855,9 @@ async def _interpolate(
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
+    
+    prompt1 = prompt1.strip()
+    prompt2 = prompt2.strip()
 
     if args.restrict_all_to_channel:
         if channel.id != args.restrict_all_to_channel:
@@ -851,9 +909,20 @@ async def _interpolate(
         short_id = output['id']
 
         file = to_discord_file_and_maybe_check_safety(image_loc)
-        await work_msg.edit(
+        work_msg = await work_msg.edit(
             content=f'Image generation for interpolate on `{prompt1}` to `{prompt2}` for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
             attachments=[file])
+
+        serialized_cmd = serialize_interpolate_request(
+            prompt1=prompt1,
+            prompt2=prompt2,
+            height=height,
+            sampler=sampler,
+            scale=scale,
+            seed=seed,
+            strength=strength,
+            width=width)
+        await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
     except Exception as e:
         await channel.send(f'Got unknown error on interpolate `{prompt1}` to `{prompt2}`: {str(e)}')
     finally:
@@ -959,10 +1028,16 @@ async def _upscale(
             raise Exception(err)
         image_loc = output['image_loc']
 
+        print()
+
         file = to_discord_file_and_maybe_check_safety(image_loc)
-        await work_msg.edit(
+        work_msg = await work_msg.edit(
             content=f'Image generation for upscale on `{docarray_id}` index {str(idx)} for <@{author_id}> complete.',
             attachments=[file])
+
+        serialized_cmd = serialize_upscale_request(docarray_id=docarray_id,
+            idx=idx)
+        await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
         completed = True
     except Exception as e:
         await channel.send(f'Got unknown error on upscale "{docarray_id}" index {str(idx)}: {str(e)}')
