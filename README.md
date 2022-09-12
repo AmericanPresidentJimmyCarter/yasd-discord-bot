@@ -2,6 +2,10 @@
 
 ![Yet Another Stable Diffusion Discord Bot Splash Image](https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/blob/master/examples/yasd.jpg?raw=true)
 
+Live now on the LAION Discord Server for you to try!
+
+[![LAION Discord Server](https://discordapp.com/api/guilds/823813159592001537/widget.png?style=banner2)](https://discord.com/invite/UxX8dv5KMh)
+
 ## Features
 
 - **Highly Scalable**: Leverages `dalle-flow` gRPC interface to independently serve images from any number of GPUs, while higher memory calls to the gRPC through the bot are forked onto individual instances of Python.
@@ -45,6 +49,8 @@
 This bot does not come equipped with a NSFW filter for content by default and will make any content out of the box. Please be sure to read and agree with the [license for the weights](https://github.com/CompVis/stable-diffusion/blob/main/LICENSE), as well as the [MIT license](https://en.wikipedia.org/wiki/MIT_License), and abide by all applicable laws and regulations in your respective area.
 
 To enable the NSFW filter to automatically add the spoiler tag to any potential NSFW images, use the flag `--nsfw-auto-spoiler`. You must first `pip install -r requirements_nsfw_filter.txt` to get the modules required for this.
+
+To enable NSFW prompt detection via BERT, use the flag `--nsfw-prompt-detection` and be sure to `pip install -r requirements_nsfw_filter.txt`.
 
 To reject any prompts if they contain a word within a wordlist, use the `--nsfw-wordlist` flag, e.g. `--nsfw-wordlist bad_words.txt`. The wordlist should be strings separated by newlines.
 

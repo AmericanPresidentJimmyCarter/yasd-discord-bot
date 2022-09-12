@@ -31,6 +31,9 @@ parser.add_argument('-g', '--guild', dest='guild',
     help='Discord guild ID', type=int, required=False)
 parser.add_argument('--nsfw-auto-spoiler', dest='auto_spoiler',
     action=argparse.BooleanOptionalAction)
+parser.add_argument('--nsfw-prompt-detection',
+    dest='nsfw_prompt_detection',
+    action=argparse.BooleanOptionalAction)
 parser.add_argument('--nsfw-wordlist',
     dest='nsfw_wordlist',
     help='Newline separated wordlist filename',
@@ -45,6 +48,7 @@ parser.add_argument('--restrict-slash-to-channel',
 args = parser.parse_args()
 
 # Load up diffusers NSFW detection model and the NSFW wordlist detector.
+nsfw_toxic_detection_fn = None
 nsfw_wordlist: list[str] = []
 safety_feature_extractor = None
 safety_checker = None
@@ -60,6 +64,9 @@ if args.auto_spoiler:
         SAFETY_MODEL_ID)
     safety_checker = StableDiffusionSafetyChecker.from_pretrained(
         SAFETY_MODEL_ID)
+if args.nsfw_prompt_detection:
+    from detoxify import Detoxify
+    nsfw_toxic_detection_fn = Detoxify('multilingual').predict
 if args.nsfw_wordlist:
     with open(args.nsfw_wordlist, 'r') as lst_f:
         nsfw_wordlist = lst_f.readlines()
@@ -207,6 +214,16 @@ def check_safety(img_loc):
 def prompt_contains_nsfw(prompt):
     if prompt is None:
         return False
+    if nsfw_toxic_detection_fn is not None:
+        results = nsfw_toxic_detection_fn(prompt)
+        # TODO Allow setting these cutoffs?
+        if results['sexual_explicit'] > 0.1 or \
+            results['obscene'] > 0.5 or \
+            results['toxicity'] > 0.8 or \
+            results['severe_toxicity'] > 0.5 or \
+            results['identity_attack'] > 0.5:
+            return True
+
     if len(nsfw_wordlist) == 0:
         return False
     return any(word in prompt.lower() for word in nsfw_wordlist)
@@ -484,9 +501,10 @@ async def _image(
     if seed_search:
         typ = 'promptsearch'
 
-    if args.nsfw_wordlist and prompt_contains_nsfw(prompt):
-        await channel.send('Sorry, this prompt contains a word in the NSFW ' +
-            'wordlist.')
+    if (args.nsfw_wordlist or nsfw_toxic_detection_fn is not None) and \
+        prompt_contains_nsfw(prompt):
+        await channel.send('Sorry, this prompt potentially contains NSFW ' +
+            'or offensive content.')
         return
 
     if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
@@ -634,9 +652,10 @@ async def _riff(
             delete_after=5)
         return
 
-    if args.nsfw_wordlist and prompt_contains_nsfw(prompt):
-        await channel.send('Sorry, this prompt contains a word in the NSFW ' +
-            'wordlist.')
+    if (args.nsfw_wordlist or nsfw_toxic_detection_fn is not None) and \
+        prompt_contains_nsfw(prompt):
+        await channel.send('Sorry, this prompt potentially contains NSFW ' +
+            'or offensive content.')
         return
 
     currently_fetching_ai_image[author_id] = f'riffs on previous work `{docarray_id}`, index {str(idx)}'
@@ -772,10 +791,10 @@ async def _interpolate(
             delete_after=5)
         return
 
-    if args.nsfw_wordlist and (prompt_contains_nsfw(prompt1) or
-        prompt_contains_nsfw(prompt2)):
-        await channel.send('Sorry, these prompts contains a word in the NSFW ' +
-            'wordlist.')
+    if (args.nsfw_wordlist or nsfw_toxic_detection_fn is not None) and (
+        prompt_contains_nsfw(prompt1) or prompt_contains_nsfw(prompt2)):
+        await channel.send('Sorry, these prompts potentially contain NSFW or ' +
+            'offensive content.')
         return
 
     short_id = None

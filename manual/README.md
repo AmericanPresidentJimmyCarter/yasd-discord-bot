@@ -108,6 +108,8 @@ To enable the NSFW filter to automatically add the spoiler tag to any potential 
 
 - `--nsfw-auto-spoiler`: Automatically add the spoiler tag to any potential NSFW images. Requires you to `pip install -r requirements_nsfw_filter.txt` first, as this requires torch.
 
+- `--nsfw-prompt-detection`: Use BERT through detoxify to detect potentially offensive or NSFW prompts.
+
 - `--nsfw-wordlist <wordlist>`:  Reject any prompts if they contain a word within a wordlist. The wordlist should be strings separated by newlines.
 
 - `--optimized-sd`: Whether or not to hide sampler or other options not available to optimized SD.
