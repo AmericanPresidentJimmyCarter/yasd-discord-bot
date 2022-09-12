@@ -114,6 +114,8 @@ To enable the NSFW filter to automatically add the spoiler tag to any potential 
 
 - `--optimized-sd`: Whether or not to hide sampler or other options not available to optimized SD.
 
+- `--restrict-all-to-channel <channel_id>`: Discord channel ID to restrict all your commands to.
+
 - `--restrict-slash-to-channel <channel_id>`: Discord channel ID to restrict your slash commands to.
 
 

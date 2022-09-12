@@ -41,6 +41,10 @@ parser.add_argument('--nsfw-wordlist',
     required=False)
 parser.add_argument('--optimized-sd', dest='optimized_sd',
     action=argparse.BooleanOptionalAction)
+parser.add_argument('--restrict-all-to-channel',
+    dest='restrict_all_to_channel',
+    help='Restrict all commands to a specific channel',
+    type=int, required=False)
 parser.add_argument('--restrict-slash-to-channel',
     dest='restrict_slash_to_channel',
     help='Restrict slash commands to a specific channel',
@@ -491,6 +495,11 @@ async def _image(
     global currently_fetching_ai_image
     author_id = str(user.id)
 
+    if args.restrict_all_to_channel:
+        if channel.id != args.restrict_all_to_channel:
+            await channel.send('You are not allowed to use this in this channel!')
+            return
+
     if steps is None:
         steps = args.default_steps
 
@@ -646,6 +655,11 @@ async def _riff(
     global currently_fetching_ai_image
     author_id = str(user.id)
 
+    if args.restrict_all_to_channel:
+        if channel.id != args.restrict_all_to_channel:
+            await channel.send('You are not allowed to use this in this channel!')
+            return
+
     short_id = None
     if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
@@ -786,6 +800,12 @@ async def _interpolate(
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
+
+    if args.restrict_all_to_channel:
+        if channel.id != args.restrict_all_to_channel:
+            await channel.send('You are not allowed to use this in this channel!')
+            return
+
     if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
@@ -901,6 +921,12 @@ async def _upscale(
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
+
+    if args.restrict_all_to_channel:
+        if channel.id != args.restrict_all_to_channel:
+            await channel.send('You are not allowed to use this in this channel!')
+            return
+
     if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
