@@ -14,7 +14,6 @@ from urllib.request import urlopen
 
 import discord
 import numpy as np
-import torch
 
 from PIL import Image
 from discord import app_commands
@@ -205,6 +204,7 @@ def bump_nonce_and_return(user_id: str):
 
 
 def img_to_tensor(img):
+    import torch
     w, h = img.size
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
     img = img.resize((w, h), resample=Image.LANCZOS)
