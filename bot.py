@@ -277,7 +277,6 @@ class YASDClient(discord.Client):
 
 client = YASDClient()
 
-
 class FourImageButtons(discord.ui.View):
     RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE = 'Select Riff Aspect Ratio'
 
@@ -496,11 +495,16 @@ async def send_alert_embed(
     work_msg: discord.Message,
     serialized_cmd: str,
 ):
-    guild_id = str(channel.guild.id)
+    guild_id = None
+    if channel.guild is not None:
+        guild_id = str(channel.guild.id)
     channel_id = str(channel.id)
     completed_id = str(work_msg.id)
     embed = discord.Embed()
-    embed.description = f'Your request has finished. [Please view it here](https://discord.com/channels/{guild_id}/{channel_id}/{completed_id}).'
+    if guild_id is not None:
+        embed.description = f'Your request has finished. [Please view it here](https://discord.com/channels/{guild_id}/{channel_id}/{completed_id}).'
+    else:
+        embed.description = f'Your request has finished. [Please view it here](https://discord.com/channels/@me/{channel_id}/{completed_id}).'
     embed.add_field(name="Command Executed", value=serialized_cmd, inline=False)
     embed.set_thumbnail(url=work_msg.attachments[0].url)
     await channel.send(f'Job completed for <@{author_id}>.', embed=embed)
@@ -1253,6 +1257,7 @@ async def on_message(message):
         if len(message.attachments) != 1:
             await message.channel.send(
                 'Please upload a single image with your message')
+            return
         else:
             image_bytes = await message.attachments[0].read()
             try:
