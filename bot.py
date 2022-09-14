@@ -175,6 +175,9 @@ def write_button_store():
 def resize_image(image):
     w, h = image.size
     ratio = float(w) / float(h)
+    
+    w = MAX_IMAGE_HEIGHT_WIDTH
+    h = MAX_IMAGE_HEIGHT_WIDTH
     if ratio > 1:
         w = MAX_IMAGE_HEIGHT_WIDTH
         h = int(float(MAX_IMAGE_HEIGHT_WIDTH) / ratio)
