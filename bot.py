@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import random
+import re
 import string
 import sys
 import time
@@ -99,6 +100,7 @@ button_store_dict: dict[str, list] = { BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY: [] 
 
 MANUAL_LINK = 'https://github.com/AmericanPresidentJimmyCarter/yasd-discord-bot/tree/master/manual#readme'
 ID_LENGTH = 12
+REGEX_FOR_ID = re.compile('([0-9a-zA-Z]){12}$')
 BUTTON_STORE = f'temp_json/button-store-{str(guild)}.json'
 JSON_IMAGE_TOOL_INPUT_FILE_FN = lambda uid, nonce: f'temp_json/request-{uid}_{nonce}.json'
 JSON_IMAGE_TOOL_OUTPUT_FILE_FN = lambda uid, nonce: f'temp_json/output-{uid}_{nonce}.json'
@@ -708,6 +710,10 @@ async def _riff(
             await channel.send('You are not allowed to use this in this channel!')
             return
 
+    if REGEX_FOR_ID.match(docarray_id) is None:
+        await channel.send(f'Got invalid docarray ID \'{docarray_id}\'')
+        return
+
     short_id = None
     if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
@@ -1002,6 +1008,10 @@ async def _upscale(
         if channel.id != args.restrict_all_to_channel:
             await channel.send('You are not allowed to use this in this channel!')
             return
+
+    if REGEX_FOR_ID.match(docarray_id) is None:
+        await channel.send(f'Got invalid docarray ID \'{docarray_id}\'')
+        return
 
     if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
