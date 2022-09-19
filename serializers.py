@@ -56,7 +56,7 @@ def serialize_image_request(
         options += f'{width=},'
     if len(options) > 0 and options[-1] == ',':
         options = f'{options[:-1]}'
-        options = remove_quotes_from_cmd_kwargs(options)
+    options = remove_quotes_from_cmd_kwargs(options)
 
     prompt = prompt_un_parenthesis(prompt)
 
@@ -105,7 +105,8 @@ def serialize_riff_request(
         options += f'{width=},'
     if len(options) > 0 and options[-1] == ',':
         options = f'{options[:-1]}'
-        options = remove_quotes_from_cmd_kwargs(options)
+        options = f'{options[:-1]}'
+    options = remove_quotes_from_cmd_kwargs(options)
 
     as_string = f'>riff {docarray_id} {idx}'
     if options == '':
@@ -142,7 +143,8 @@ def serialize_interpolate_request(
         options += f'{width=},'
     if len(options) > 0 and options[-1] == ',':
         options = f'{options[:-1]}'
-        options = remove_quotes_from_cmd_kwargs(options)
+        options = f'{options[:-1]}'
+    options = remove_quotes_from_cmd_kwargs(options)
 
     prompt1 = prompt_un_parenthesis(prompt1)
     if '|' in prompt1:
