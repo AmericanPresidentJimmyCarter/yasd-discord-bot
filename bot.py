@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import datetime
 import json
 import os
 import pathlib
@@ -37,6 +38,10 @@ parser.add_argument('--allow-queue', dest='allow_queue',
     action=argparse.BooleanOptionalAction)
 parser.add_argument('--default-steps', dest='default_steps', nargs='?',
     type=int, help='Default number of steps for the sampler', default=50)
+parser.add_argument('--hours-on-server-to-use', dest='hours_needed', nargs='?',
+    type=int,
+    help='The hours the user has been on the server before they can use the bot',
+    required=False)
 parser.add_argument('-g', '--guild', dest='guild',
     help='Discord guild ID', type=int, required=False)
 parser.add_argument('--nsfw-auto-spoiler', dest='auto_spoiler',
@@ -295,6 +300,22 @@ def to_discord_file_and_maybe_check_safety(img_loc):
     if args.auto_spoiler:
         nsfw = check_safety(img_loc)
     return discord.File(img_loc, spoiler=nsfw)
+
+
+async def check_user_joined_at(
+    channel: discord.abc.GuildChannel,
+    user: discord.abc.User,
+):
+    if not args.hours_needed:
+        return True
+    duration = datetime.datetime.utcnow() - user.joined_at.replace(tzinfo=None)
+    hours_int = int(duration.total_seconds()) // 60 ** 2
+    if duration < datetime.timedelta(hours=args.hours_needed):
+        await channel.send('Sorry, you have not been on this server long enough ' +
+            f'to use the bot (needed {args.hours_needed} hours, have ' +
+            f'{hours_int} hours).')
+        return False
+    return True
 
 
 intents = discord.Intents(
@@ -739,6 +760,9 @@ async def _image(
         await channel.send('Sorry, one of your custom embeddings is invalid.')
         return
 
+    if not await check_user_joined_at(channel, user):
+        return
+
     if not args.allow_queue and currently_fetching_ai_image.get(author_id, False) is not False:
         await channel.send(f'Sorry, I am currently working on the image prompt "{currently_fetching_ai_image[author_id]}". Please be patient until I finish that.',
             delete_after=5)
@@ -919,6 +943,9 @@ async def _riff(
         await channel.send('Sorry, one of your custom embeddings is invalid.')
         return
 
+    if not await check_user_joined_at(channel, user):
+        return
+
     currently_fetching_ai_image[author_id] = f'riffs on previous work `{docarray_id}`, index {str(idx)}'
     work_msg = await channel.send(f'Now beginning work on "riff `{docarray_id}` index {str(idx)}" for <@{author_id}>. Please be patient until I finish that.')
     try:
@@ -1093,6 +1120,9 @@ async def _interpolate(
         prompt_has_valid_sd_custom_embeddings(prompt2)
     except Exception as e:
         await channel.send('Sorry, one of your custom embeddings is invalid.')
+        return
+
+    if not await check_user_joined_at(channel, user):
         return
 
     short_id = None
