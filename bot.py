@@ -21,6 +21,7 @@ import numpy as np
 from PIL import Image
 from discord import app_commands
 from docarray import Document, DocumentArray
+from transformers import CLIPTokenizer
 
 SELF_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SELF_DIR))
@@ -108,6 +109,8 @@ REGEX_FOR_TAGS = re.compile('<.*?>')
 
 ID_LENGTH = 12
 BUTTON_STORE = f'temp_json/button-store-{str(guild)}.json'
+CLIP_TOKENIZER_MERGES_FN = 'clip_vit_large_patch14/merges.txt'
+CLIP_TOKENIZER_VOCAB_FN = 'clip_vit_large_patch14/vocab.json'
 DISCORD_EMBED_MAX_LENGTH = 1024
 DOCARRAY_LOCATION_FN = lambda docarray_id: f'image_docarrays/{docarray_id}.bin'
 IMAGE_LOCATION_FN = lambda sid: f'images/{sid}.png'
@@ -123,9 +126,10 @@ MAX_STEPS = 250
 MIN_STRENGTH = 0.01
 MIN_STRENGTH_INTERPOLATE = 0.50
 MAX_STRENGTH = 0.99
-NUM_IMAGES_MAX = 9
 MIN_IMAGE_HEIGHT_WIDTH = 384
 MAX_IMAGE_HEIGHT_WIDTH = 768
+MAX_MODEL_CLIP_TOKENS_PER_PROMPT = 77
+NUM_IMAGES_MAX = 9
 VALID_IMAGE_HEIGHT_WIDTH = { 384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
     704, 736, 768 }
 VALID_TAG_CONCEPTS = {}
@@ -315,6 +319,44 @@ async def check_user_joined_at(
             f'to use the bot (needed {args.hours_needed} hours, have ' +
             f'{hours_int} hours).')
         return False
+    return True
+
+
+async def check_subprompt_token_length(
+    channel: discord.abc.GuildChannel,
+    user_id: str,
+    prompt: str,
+):
+    prompt_parser = re.compile("""
+        (?P<prompt>     # capture group for 'prompt'
+        (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
+        )               # end 'prompt'
+        (?:             # non-capture group
+        :+              # match one or more ':' characters
+        (?P<weight>     # capture group for 'weight'
+        -?\d+(?:\.\d+)? # match positive or negative integer or decimal number
+        )?              # end weight capture group, make optional
+        \s*             # strip spaces after weight
+        |               # OR
+        $               # else, if no ':' then match end of line
+        )               # end non-capture group
+        """, re.VERBOSE)
+    parsed_prompts = [match.group('prompt').replace('\\:', ':')
+        for match in re.finditer(prompt_parser, prompt)]
+
+    tokenizer = CLIPTokenizer(CLIP_TOKENIZER_VOCAB_FN, CLIP_TOKENIZER_MERGES_FN)
+    for subprompt in parsed_prompts:
+        as_tokens = tokenizer(subprompt)
+        if as_tokens.get('input_ids', None) is None:
+            await channel.send(f'Unable to subprompt parse prompt "{subprompt}"')
+            return False
+        n_tokens = len(as_tokens['input_ids'])
+        if n_tokens > MAX_MODEL_CLIP_TOKENS_PER_PROMPT:
+            await channel.send(f'Subprompt "{subprompt}" for user <@{user_id}> ' +
+                f'is too long (got {n_tokens}, max ' +
+                f'{MAX_MODEL_CLIP_TOKENS_PER_PROMPT}). Shorten this subprompt ' +
+                'or break into multiple weighted subprompts.')
+            return False
     return True
 
 
@@ -771,6 +813,9 @@ async def _image(
         await channel.send('Sorry, one of your custom embeddings is invalid.')
         return
 
+    if not await check_subprompt_token_length(channel, author_id, prompt):
+        return
+
     if not await check_user_joined_at(channel, user):
         return
 
@@ -952,6 +997,9 @@ async def _riff(
         prompt_has_valid_sd_custom_embeddings(prompt)
     except Exception as e:
         await channel.send('Sorry, one of your custom embeddings is invalid.')
+        return
+
+    if not await check_subprompt_token_length(channel, author_id, prompt):
         return
 
     if not await check_user_joined_at(channel, user):
@@ -1227,6 +1275,12 @@ async def _interpolate(
         prompt_has_valid_sd_custom_embeddings(prompt2)
     except Exception as e:
         await channel.send('Sorry, one of your custom embeddings is invalid.')
+        return
+
+    if not await check_subprompt_token_length(channel, author_id, prompt1):
+        return
+
+    if not await check_subprompt_token_length(channel, author_id, prompt2):
         return
 
     if not await check_user_joined_at(channel, user):

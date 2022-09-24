@@ -5,3 +5,5 @@ aiohttp
 docarray
 jina
 numpy
+transformers
+ftfy
