@@ -108,6 +108,7 @@ REGEX_FOR_TAGS = re.compile('<.*?>')
 
 ID_LENGTH = 12
 BUTTON_STORE = f'temp_json/button-store-{str(guild)}.json'
+DISCORD_EMBED_MAX_LENGTH = 1024
 DOCARRAY_LOCATION_FN = lambda docarray_id: f'image_docarrays/{docarray_id}.bin'
 IMAGE_LOCATION_FN = lambda sid: f'images/{sid}.png'
 JSON_IMAGE_TOOL_INPUT_FILE_FN = lambda uid, nonce: f'temp_json/request-{uid}_{nonce}.json'
@@ -710,7 +711,18 @@ async def send_alert_embed(
         embed.description = f'Your request has finished. [Please view it here](https://discord.com/channels/{guild_id}/{channel_id}/{completed_id}).'
     else:
         embed.description = f'Your request has finished. [Please view it here](https://discord.com/channels/@me/{channel_id}/{completed_id}).'
-    embed.add_field(name="Command Executed", value=serialized_cmd, inline=False)
+    serialized_chunks = [
+        serialized_cmd[_i:_i + DISCORD_EMBED_MAX_LENGTH]
+        for _i in range(0, len(serialized_cmd), DISCORD_EMBED_MAX_LENGTH)
+    ]
+    if len(serialized_chunks) == 1:
+        embed.add_field(name="Command Executed", value=serialized_cmd, inline=False)
+    else:
+        for idx, chunk in enumerate(serialized_chunks):
+            embed.add_field(
+                name="Command Executed" if not idx else '',
+                value=chunk, inline=False)
+
     embed.set_thumbnail(url=work_msg.attachments[0].url)
     await channel.send(f'Job completed for <@{author_id}>.', embed=embed)
 
