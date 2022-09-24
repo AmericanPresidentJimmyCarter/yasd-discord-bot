@@ -45,9 +45,14 @@ Options:
 - `width`: The width of the output in pixels. Min 384, max 768, steps in 64.
 
 ### image2image
+- `/image2image <url> <prompt>` (slash command)
 - `>image2image prompt (foo=bar)` (direct message command)
 
-Diffuse an image that was uploaded with this message. Only works as a direct message command because Discord does not yet allow files to be uploaded with slash commands.
+Diffuse an image that was uploaded with this message.
+
+The only way to make it work with uploading a file is as a direct message command because Discord does not yet allow files to be uploaded with slash commands.
+
+When using the slash command, a URL may be specified to download an image from instead.
 
 Options: Same as for Riff (Diffusion) below.
 

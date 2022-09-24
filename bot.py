@@ -11,7 +11,8 @@ import sys
 import time
 
 from io import BytesIO
-from typing import Any, Optional, Union
+from typing import Optional, Union
+from urllib.error import URLError
 from urllib.request import urlopen
 
 import discord
@@ -124,9 +125,9 @@ MAX_STRENGTH = 0.99
 NUM_IMAGES_MAX = 9
 MIN_IMAGE_HEIGHT_WIDTH = 384
 MAX_IMAGE_HEIGHT_WIDTH = 768
-VALID_IMAGE_HEIGHT_WIDTH = { 384, 448, 512, 576, 640, 704, 768 }
+VALID_IMAGE_HEIGHT_WIDTH = { 384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
+    704, 736, 768 }
 VALID_TAG_CONCEPTS = {}
-
 
 
 def short_id_generator():
@@ -144,12 +145,18 @@ SAMPLER_CHOICES = [
 ]
 
 HEIGHT_AND_WIDTH_CHOICES = [
-    app_commands.Choice(name="512", value=512),
+    app_commands.Choice(name="512 (Default)", value=512),
     app_commands.Choice(name="384", value=384),
+    app_commands.Choice(name="416", value=416),
     app_commands.Choice(name="448", value=448),
+    app_commands.Choice(name="480", value=480),
+    app_commands.Choice(name="544", value=544),
     app_commands.Choice(name="576", value=576),
+    app_commands.Choice(name="608", value=608),
     app_commands.Choice(name="640", value=640),
+    app_commands.Choice(name="672", value=672),
     app_commands.Choice(name="704", value=704),
+    app_commands.Choice(name="736", value=736),
     app_commands.Choice(name="768", value=768),
 ]
 
@@ -193,7 +200,7 @@ def resize_image(image):
         if w < MIN_IMAGE_HEIGHT_WIDTH:
             w = MIN_IMAGE_HEIGHT_WIDTH
         h = MAX_IMAGE_HEIGHT_WIDTH
-    w, h = map(lambda x: x - x % 64, (w, h))  # resize to integer multiple of 64
+    w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
     return image.resize((w, h), resample=Image.LANCZOS)
 
 
@@ -1053,6 +1060,102 @@ async def riff(
             return
 
     sid = await _riff(interaction.channel, interaction.user, docarray_id, idx,
+        height=height.value if height is not None else None,
+        iterations=iterations,
+        latentless=bool(latentless),
+        prompt=prompt,
+        sampler=sampler.value if sampler is not None else None,
+        scale=scale,
+        seed=seed,
+        steps=steps,
+        strength=strength,
+        width=width.value if width is not None else None)
+    if sid is not None:
+        await interaction.followup.send(sid)
+    else:
+        await interaction.followup.send('Failed!')
+
+
+@client.tree.command(
+    description='Create an image from a URL',
+)
+@app_commands.describe(
+    url='URL for an image',
+    prompt='Prompt to use for riffing the image',
+    height='Height of the image (default=512)',
+    iterations='Number of diffusion iterations (1 to 16, default=1)',
+    latentless='Do not compute latent embeddings from original image (default=False)',
+    sampler='Which sampling algorithm to use (k_lms, ddim, dpm2, dpm2_ancestral, heun, euler, or euler_ancestral. default=k_lms)',
+    scale='Conditioning scale for prompt (1.0 to 50.0, default=7.5)',
+    seed='Deterministic seed for prompt (1 to 2^32-1, default=random)',
+    strength="Strength of conditioning (0.01 <= strength <= 0.99, default=0.75)",
+    width='Width of the image (default=512)',
+)
+@app_commands.choices(
+    height=HEIGHT_AND_WIDTH_CHOICES,
+    sampler=SAMPLER_CHOICES,
+    width=HEIGHT_AND_WIDTH_CHOICES,
+)
+async def image2image(
+    interaction: discord.Interaction,
+
+    url: str,
+    prompt: str,
+
+    height: Optional[app_commands.Choice[int]] = None,
+    iterations: Optional[app_commands.Range[int, MIN_ITERATIONS, MAX_ITERATIONS]] = None,
+    latentless: Optional[bool]=False,
+    sampler: Optional[app_commands.Choice[str]] = None,
+    scale: Optional[app_commands.Range[float, MIN_SCALE, MAX_SCALE]] = None,
+    seed: Optional[app_commands.Range[int, 0, MAX_SEED]] = None,
+    steps: Optional[app_commands.Range[int, MIN_STEPS, MAX_STEPS]] = None,
+    strength: Optional[app_commands.Range[float, MIN_STRENGTH, MAX_STRENGTH]] = None,
+    width: Optional[app_commands.Choice[int]] = None,
+):
+    await interaction.response.defer(thinking=True)
+
+    if args.restrict_slash_to_channel:
+        if interaction.channel.id != args.restrict_slash_to_channel:
+            await interaction.followup.send('You are not allowed to use this in this channel!')
+            return
+
+    image = None
+    short_id = short_id_generator()
+    try:
+        url_data = urlopen(url)
+        image = Image.open(BytesIO(url_data.read()))
+    except URLError as e:
+        await interaction.followup.send(f'Bad image URL "{url}": {str(e)}!')
+        return
+    except OSError as e:
+        await interaction.followup.send(f'Failed to parse image!')
+        return
+
+    image_fn = IMAGE_LOCATION_FN(short_id)
+    da_fn = DOCARRAY_LOCATION_FN(short_id)
+    image = resize_image(image).convert('RGB')
+    image.save(image_fn, format='PNG')
+
+    buffered = BytesIO()
+    image.save(buffered, format='PNG')
+    _d = Document(
+        blob=buffered.getvalue(),
+        mime_type='image/png',
+        tags={
+            'text': '',
+            'generator': 'discord image upload',
+            'request_time': int(time.time()),
+        },
+    ).convert_blob_to_datauri()
+    _d.text = prompt
+    da = DocumentArray([_d])
+    da.save_binary(da_fn, protocol='protobuf', compress='lz4')
+
+    await interaction.channel.send(f'URL "{url}" sent by ' +
+        f'<@{str(interaction.user.id)}> has been uploaded and ' +
+        f'given ID `{short_id}`.')
+
+    sid = await _riff(interaction.channel, interaction.user, short_id, 0,
         height=height.value if height is not None else None,
         iterations=iterations,
         latentless=bool(latentless),
