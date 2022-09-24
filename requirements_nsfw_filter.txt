@@ -10,3 +10,4 @@ torch
 transformers
 detoxify
 ftfy
+tqdm

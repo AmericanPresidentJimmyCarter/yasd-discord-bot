@@ -21,6 +21,7 @@ import numpy as np
 from PIL import Image
 from discord import app_commands
 from docarray import Document, DocumentArray
+from tqdm import tqdm
 from transformers import CLIPTokenizer
 
 SELF_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1942,7 +1943,7 @@ async def on_ready():
     forty_eight_hours_ago = now - 2 * 24 * 60 * 60
     # init the button handler and load up any previously saved buttons. Skip
     # any buttons that are more than 48 hours old.
-    for view_dict in button_store_dict[BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY]:
+    for view_dict in tqdm(button_store_dict[BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY]):
         if view_dict['time'] >= forty_eight_hours_ago:
             view = FourImageButtons.from_serialized(view_dict)
             client.add_view(view, message_id=view_dict['message_id'])
