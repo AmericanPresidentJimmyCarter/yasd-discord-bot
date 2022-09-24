@@ -2,3 +2,4 @@ env
 image_docarrays/*
 images/*
 temp_json/*
+__pycache__
