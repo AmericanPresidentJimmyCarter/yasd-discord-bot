@@ -400,7 +400,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
             prompt = request['prompt']
 
             if request.get('height', None) is not None:
-                params['height'] = request['sampler']
+                params['height'] = request['height']
             if request.get('resample_prior', True) is False:
                 params['resample_prior'] = request['resample_prior']
             if request.get('sampler', None) is not None:
