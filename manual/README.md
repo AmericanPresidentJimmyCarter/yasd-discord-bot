@@ -30,6 +30,12 @@ For all commands that use indexes, the indexes are stored from left to right per
 
 Generate an image from a text prompt. Images may be given variations with an array format by enclosing values in square brackets e.g. "a [red, blue, green, purple] ball".
 
+You can use concepts in your prompt from the [Stable Diffusion Concepts library](https://huggingface.co/sd-concepts-library) by simply entering the URL suffix of the concept library in `<>` brackets in the prompt. For example, to use the [SkyFalls](https://huggingface.co/sd-concepts-library/skyfalls) concept, simply put `<skyfalls>` into the prompt. Note that it is _not_ using the token identifier `<SkyFalls>`, but instead is using the URL suffix `skyfalls`.
+
+Prompt weighting can be achieved using subprompts by adding a colon and then a weight (float). For example, you can create a cat-tiger hybrid with the prompt `tabby cat:0.75 tiger:0.25`. You can also use negative conditioning through subprompts by using a negative float value. For example, if you wanted a human Hatsune Miku, you would use the prompt `hatsune miku:1 anime:-1`.
+
+By default Stable Diffusion limits you to 77 tokens from the CLIP tokenizer in your prompt. This bot is _not_ limited to that many tokens, and you can use as many as you can fit into the subprompt limit by adding `:1` to the end of each prompt.
+
 Options:
 - `height`: The height of the output in pixels. Min 384, max 768, steps in 64.
 - `sampler`: Which sampler to use when creating the image. Some samplers, such as `euler`, may require fewer steps to get good results, while others can have [a dramatic effect](https://i.redd.it/uy2fp799wmj91.jpg) on image generation itself. Defaults to `k_lms`.
@@ -98,21 +104,19 @@ Upscale buttons using the feature are automatically added to all `riff` or `imag
 
 ### Bot arguments
 
-To enable the NSFW filter to automatically add the spoiler tag to any potential NSFW images, use the flag ``.
-
-- `-g <guild_id>` or `--guild <guild_id>`: Discord guild/server ID to send your slash commands to. If not specified, it may take up to an hour for your slash commands to show up.
-
 - `--allow-queue`: If this is true, the users are allowed to make any quantity of images for themselves at the same time. By default, users are restricted to one image at a time.
 
 - `--default-steps <steps>`: The default number of steps to use on `/image` or `>image`.
+
+- `-g <guild_id>` or `--guild <guild_id>`: Discord guild/server ID to send your slash commands to. If not specified, it may take up to an hour for your slash commands to show up.
+
+- `--hours-on-server-to-use <hours>`: The number of hours a user must have been on the server to use the bot.
 
 - `--nsfw-auto-spoiler`: Automatically add the spoiler tag to any potential NSFW images. Requires you to `pip install -r requirements_nsfw_filter.txt` first, as this requires torch.
 
 - `--nsfw-prompt-detection`: Use BERT through detoxify to detect potentially offensive or NSFW prompts.
 
 - `--nsfw-wordlist <wordlist>`:  Reject any prompts if they contain a word within a wordlist. The wordlist should be strings separated by newlines.
-
-- `--optimized-sd`: Whether or not to hide sampler or other options not available to optimized SD.
 
 - `--restrict-all-to-channel <channel_id>`: Discord channel ID to restrict all your commands to.
 
@@ -122,6 +126,14 @@ To enable the NSFW filter to automatically add the spoiler tag to any potential 
 ### config.yml for Stable Diffusion Executor
 
 If you have installed the Native Installation, you can find a simple configuration file in `dalle/dalle-flow/executors/stable/config.yml`. Here you can alter the default number of samples to generate at the same time along with the resolution of the images generated.
+
+### Multi-GPU setup
+
+In `tmp.flow.yml`, change `CUDA_VISIBLE_DEVICES` for the `stable` executor to be either `RR#:#` or `RR#,#,#,...`, where `#` is the device ID of your GPU. For example, you can select GPUs 0, 1, and 2 with `RR0:3`. Alternatively, you can select them with a command separated list as `RR0,1,2`.
+
+After setting that, adjust the number of replicas. For example, if you wanted 2x executors running on 3x GPUs with the above settings for `CUDA_VISIBLE_DEVICES`, you would set `replicas: 6`.
+
+Requests are round-robined to free GPUs in a multi-GPU setup. You can also place things like the upscaler on their own cards.
 
 ### Other models
 

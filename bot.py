@@ -54,8 +54,6 @@ parser.add_argument('--nsfw-wordlist',
     help='Newline separated wordlist filename',
     type=str,
     required=False)
-parser.add_argument('--optimized-sd', dest='optimized_sd',
-    action=argparse.BooleanOptionalAction)
 parser.add_argument('--restrict-all-to-channel',
     dest='restrict_all_to_channel',
     help='Restrict all commands to a specific channel',
@@ -136,20 +134,14 @@ def short_id_generator():
         string.ascii_uppercase + string.digits, k=ID_LENGTH))
 
 
-if args.optimized_sd:
-    SAMPLER_CHOICES = [
-        app_commands.Choice(name="ddim", value="ddim"),
-    ]
-else:
-    SAMPLER_CHOICES = [
-        app_commands.Choice(name="k_lms", value="k_lms"),
-        app_commands.Choice(name="ddim", value="ddim"),
-        app_commands.Choice(name="dpm2", value="dpm2"),
-        app_commands.Choice(name="dpm2_ancestral", value="dpm2_ancestral"),
-        app_commands.Choice(name="heun", value="heun"),
-        app_commands.Choice(name="euler", value="euler"),
-        app_commands.Choice(name="euler_ancestral", value="euler_ancestral"),
-    ]
+SAMPLER_CHOICES = [
+    app_commands.Choice(name="k_lms", value="k_lms"),
+    app_commands.Choice(name="dpm2", value="dpm2"),
+    app_commands.Choice(name="dpm2_ancestral", value="dpm2_ancestral"),
+    app_commands.Choice(name="heun", value="heun"),
+    app_commands.Choice(name="euler", value="euler"),
+    app_commands.Choice(name="euler_ancestral", value="euler_ancestral"),
+]
 
 HEIGHT_AND_WIDTH_CHOICES = [
     app_commands.Choice(name="512", value=512),
