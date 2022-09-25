@@ -328,6 +328,9 @@ async def check_subprompt_token_length(
     user_id: str,
     prompt: str,
 ):
+    if prompt is None or prompt == '':
+        return True
+
     prompt_parser = re.compile("""
         (?P<prompt>     # capture group for 'prompt'
         (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
@@ -347,6 +350,8 @@ async def check_subprompt_token_length(
 
     tokenizer = CLIPTokenizer(CLIP_TOKENIZER_VOCAB_FN, CLIP_TOKENIZER_MERGES_FN)
     for subprompt in parsed_prompts:
+        if subprompt is None or subprompt == '':
+            continue
         as_tokens = tokenizer(subprompt)
         if as_tokens.get('input_ids', None) is None:
             await channel.send(f'Unable to subprompt parse prompt "{subprompt}"')
