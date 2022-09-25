@@ -91,7 +91,7 @@ def serialize_riff_request(
         options += f'{height=},'
     if iterations is not None:
         options += f'{iterations=},'
-    if latentless is not None:
+    if latentless is True:
         options += f'{latentless=},'
     if prompt is not None:
         prompt = prompt_un_parenthesis_un_comma(prompt, uncomma=True)
