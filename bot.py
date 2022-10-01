@@ -597,7 +597,6 @@ class FourImageButtons(discord.ui.View):
         if original_request is not None and \
             original_request['api'] == 'stablediffuse':
             latentless = original_request['latentless']
-            prompt_mask = original_request.get('prompt_mask', None)
             resize = original_request.get('resize', False)
             sampler = original_request['sampler']
             scale = original_request['scale']
@@ -611,7 +610,6 @@ class FourImageButtons(discord.ui.View):
         await _riff(interaction.channel, interaction.user, self.short_id, idx,
             height=self.pixels_height,
             latentless=latentless,
-            prompt_mask=prompt_mask,
             resize=resize,
             sampler=sampler,
             scale=scale,
