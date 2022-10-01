@@ -519,10 +519,11 @@ class FourImageButtons(discord.ui.View):
             docarray_loc, protocol='protobuf', compress='lz4'
         )
 
+        latentless = False
+        resize = False
         sampler = None
         scale = None
         steps = None
-        latentless = None
         strength = None
 
         original_request = da[0].tags.get('request', None)
@@ -533,10 +534,11 @@ class FourImageButtons(discord.ui.View):
             steps = int(original_request['steps'])
         if original_request is not None and \
             original_request['api'] == 'stablediffuse':
+            latentless = original_request['latentless']
+            resize = original_request.get('resize', False)
             sampler = original_request['sampler']
             scale = original_request['scale']
             steps = int(original_request['steps'])
-            latentless = original_request['latentless']
             strength = original_request['strength']
 
         if self.strength is not None:
@@ -546,6 +548,7 @@ class FourImageButtons(discord.ui.View):
         await _riff(interaction.channel, interaction.user, self.short_id, idx,
             height=self.pixels_height,
             latentless=latentless,
+            resize=resize,
             sampler=sampler,
             scale=scale,
             seed=random.randint(1, 2 ** 32 - 1),
@@ -582,10 +585,11 @@ class FourImageButtons(discord.ui.View):
                 steps=steps,
                 width=width)
         if original_request['api'] == 'stablediffuse':
+            resize = original_request.get('resize', False)
+            latentless = original_request['latentless']
             sampler = original_request['sampler']
             scale = original_request['scale']
             steps = int(original_request['steps'])
-            latentless = original_request['latentless']
             strength = original_request['strength']
 
             await _riff(
@@ -593,6 +597,7 @@ class FourImageButtons(discord.ui.View):
                 self.short_id_parent, self.idx_parent,
                 height=height,
                 latentless=latentless,
+                resize=resize,
                 sampler=sampler,
                 scale=scale,
                 seed=random.randint(1, 2 ** 32 - 1),
@@ -985,6 +990,7 @@ async def _riff(
     iterations: Optional[int]=None,
     latentless: bool=False,
     prompt: Optional[str]=None,
+    resize: bool=False,
     sampler: Optional[str]=None,
     scale: Optional[float]=None,
     seed: Optional[int]=None,
@@ -1039,6 +1045,7 @@ async def _riff(
             'iterations': iterations,
             'latentless': bool(latentless),
             'prompt': prompt,
+            'resize': bool(resize),
             'sampler': sampler,
             'scale': scale,
             'seed': seed,
@@ -1082,6 +1089,7 @@ async def _riff(
             iterations=iterations,
             latentless=bool(latentless),
             prompt=prompt,
+            resize=bool(resize),
             sampler=sampler,
             scale=scale,
             seed=seed_from_docarray_id(short_id),
@@ -1107,6 +1115,7 @@ async def _riff(
     iterations='Number of diffusion iterations (1 to 16, default=1)',
     latentless='Do not compute latent embeddings from original image (default=False)',
     prompt='Prompt, which overrides the original prompt for the image (default=None)',
+    resize='Resize the image when adjusting width/height instead of attempting outriff (default=False)',
     sampler='Which sampling algorithm to use (k_lms, ddim, dpm2, dpm2_ancestral, heun, euler, or euler_ancestral. default=k_lms)',
     scale='Conditioning scale for prompt (1.0 to 50.0, default=7.5)',
     seed='Deterministic seed for prompt (1 to 2^32-1, default=random)',
@@ -1128,6 +1137,7 @@ async def riff(
     iterations: Optional[app_commands.Range[int, MIN_ITERATIONS, MAX_ITERATIONS]] = None,
     latentless: Optional[bool]=False,
     prompt: Optional[str]=None,
+    resize: Optional[bool]=False,
     sampler: Optional[app_commands.Choice[str]] = None,
     scale: Optional[app_commands.Range[float, MIN_SCALE, MAX_SCALE]] = None,
     seed: Optional[app_commands.Range[int, 0, MAX_SEED]] = None,
@@ -1147,6 +1157,7 @@ async def riff(
         iterations=iterations,
         latentless=bool(latentless),
         prompt=prompt,
+        resize=bool(resize),
         sampler=sampler.value if sampler is not None else None,
         scale=scale,
         seed=seed,
@@ -1616,6 +1627,7 @@ async def on_message(message):
         iterations = None
         latentless = False
         prompt = None
+        resize = False
         sampler = None
         scale = None
         seed = None
@@ -1648,6 +1660,8 @@ async def on_message(message):
                     pass
             if 'latentless' in opts:
                 latentless = True
+            if 'resize' in opts:
+                resize = True
             if 'sampler' in opts:
                 sampler = opts['sampler']
             if 'scale' in opts:
@@ -1691,6 +1705,7 @@ async def on_message(message):
             iterations=iterations,
             latentless=bool(latentless),
             prompt=prompt,
+            resize=resize,
             sampler=sampler,
             scale=scale,
             seed=seed,
@@ -1738,6 +1753,7 @@ async def on_message(message):
 
         iterations = None
         latentless = False
+        resize = False
         sampler = None
         scale = None
         seed = None
@@ -1764,6 +1780,8 @@ async def on_message(message):
                         pass
                 if 'latentless' in opts:
                     latentless = True
+                if 'resize' in opts:
+                    resize = True
                 if 'sampler' in opts:
                     sampler = opts['sampler']
                 if 'scale' in opts:
@@ -1800,6 +1818,7 @@ async def on_message(message):
             iterations=iterations,
             latentless=latentless,
             prompt=prompt,
+            resize=resize,
             sampler=sampler,
             scale=scale,
             seed=seed,

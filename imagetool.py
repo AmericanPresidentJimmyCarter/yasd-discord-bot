@@ -8,6 +8,7 @@ import traceback
 
 from copy import deepcopy
 from io import BytesIO
+from typing import Any
 from urllib.request import urlopen
 
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
@@ -140,6 +141,12 @@ def resize_with_padding(img, expected_size):
         ), 255, 0, False)
 
     return Image.composite(expanded, noised, mask)
+
+
+def tweak_docarray_tags_request(doc_arr: DocumentArray, key: str, val: Any):
+    for doc in doc_arr:
+        if 'request' in doc.tags and isinstance(doc.tags['request'], dict):
+            doc.tags['request'][key] = val
 
 
 output = {}
@@ -317,6 +324,22 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 _d.text = prompt
                 da = DocumentArray([_d])
 
+            if request.get('resize', False) is True and \
+                request.get('height', None) is not None and \
+                request.get('width', None) is not None:
+                resized_image = orig_image.resize((
+                    request['width'],
+                    request['height'],
+                ), Image.LANCZOS)
+                buffered = BytesIO()
+                resized_image.save(buffered, format='PNG')
+                _d = Document(
+                    blob=buffered.getvalue(),
+                    mime_type='image/png',
+                ).convert_blob_to_datauri()
+                _d.text = orig_prompt
+                da = DocumentArray([_d])
+
             params = {'num_images': 4}
             if request.get('height', None) is not None:
                 params['height'] = request['height']
@@ -342,8 +365,10 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 params['width'] = orig_width
 
             diffused_da = None
-            if params['height'] != orig_height or \
-                params['width'] != orig_width:
+            if not request.get('resize', False) and (
+                    params['height'] != orig_height or
+                    params['width'] != orig_width
+                ):
                 img_new = resize_with_padding(orig_image,
                     (params['width'], params['height']))
                 buffered = BytesIO()
@@ -384,6 +409,9 @@ with open(FILE_NAME_IN, 'r') as request_json:
             short_id = short_id_generator()
             image_loc = IMAGE_LOCATION_FN(short_id)
             docarray_loc = DOCARRAY_LOCATION_FN(short_id)
+
+            tweak_docarray_tags_request(diffused_da, 'resize',
+                request.get('resize', False))
 
             diffused_da.plot_image_sprites(output=image_loc, show_index=True,
                 keep_aspect_ratio=True, canvas_size=params['width']*2)
