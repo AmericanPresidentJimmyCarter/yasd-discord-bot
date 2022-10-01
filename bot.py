@@ -547,6 +547,7 @@ class FourImageButtons(discord.ui.View):
             latentless=latentless,
             sampler=sampler,
             scale=scale,
+            seed=random.randint(1, 2 ** 32 - 1),
             steps=steps,
             strength=strength,
             width=self.pixels_width)
@@ -590,6 +591,7 @@ class FourImageButtons(discord.ui.View):
                 latentless=latentless,
                 sampler=sampler,
                 scale=scale,
+                seed=random.randint(1, 2 ** 32 - 1),
                 steps=steps,
                 strength=strength,
                 width=self.pixels_width)
