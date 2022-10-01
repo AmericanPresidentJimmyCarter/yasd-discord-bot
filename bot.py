@@ -420,14 +420,15 @@ class FourImageButtons(discord.ui.View):
         self.short_id_parent = short_id_parent
         self.strength = strength
 
-        old_docarray_loc = DOCARRAY_LOCATION_FN(short_id)
+        self.pixels_width, self.pixels_height = self.original_image_sizes()
+
+    def original_image_sizes(self):
+        old_docarray_loc = DOCARRAY_LOCATION_FN(self.short_id)
         da = DocumentArray.load_binary(
             old_docarray_loc, protocol='protobuf', compress='lz4'
         )
         loaded = document_to_pil(da[0])
-        orig_width, orig_height = loaded.size
-        self.pixels_width = orig_width
-        self.pixels_height = orig_height
+        return loaded.size
 
     def serialize_to_json_and_store(self):
         '''
@@ -566,6 +567,8 @@ class FourImageButtons(discord.ui.View):
         if original_request is None:
             await interaction.channel.send('No original request could be found')
 
+        width, height = self.original_image_sizes()
+
         if original_request['api'] == 'txt2img':
             prompt = da[0].tags['text']
             sampler = original_request['sampler']
@@ -573,28 +576,29 @@ class FourImageButtons(discord.ui.View):
             steps = int(original_request['steps'])
             await _image(interaction.channel, interaction.user,
                 prompt,
-                height=self.pixels_height,
+                height=height,
                 sampler=sampler,
                 scale=scale,
                 steps=steps,
-                width=self.pixels_width)
+                width=width)
         if original_request['api'] == 'stablediffuse':
             sampler = original_request['sampler']
             scale = original_request['scale']
             steps = int(original_request['steps'])
             latentless = original_request['latentless']
             strength = original_request['strength']
+
             await _riff(
                 interaction.channel, interaction.user,
                 self.short_id_parent, self.idx_parent,
-                height=self.pixels_height,
+                height=height,
                 latentless=latentless,
                 sampler=sampler,
                 scale=scale,
                 seed=random.randint(1, 2 ** 32 - 1),
                 steps=steps,
                 strength=strength,
-                width=self.pixels_width)
+                width=width)
 
     async def handle_upscale(self,
         interaction: discord.Interaction,
@@ -695,9 +699,12 @@ class FourImageButtons(discord.ui.View):
         options=[
             discord.SelectOption(label='2:1 (landscape)', value='2:1'),
             discord.SelectOption(label='3:2', value='3:2'),
+            discord.SelectOption(label='4:3', value='4:3'),
             discord.SelectOption(label='1:1 (square)', value='1:1'),
+            discord.SelectOption(label='3:4', value='3:4'),
             discord.SelectOption(label='2:3', value='2:3'),
             discord.SelectOption(label='1:2 (portait)', value='1:2'),
+            discord.SelectOption(label='Original Image Size', value='original'),
         ])
     async def select_aspect_ratio(self, interaction: discord.Interaction,
         selection: discord.ui.Select):
@@ -709,15 +716,23 @@ class FourImageButtons(discord.ui.View):
         if sel == '3:2': # ish
             self.pixels_height = 448
             self.pixels_width = 704
+        if sel == '4:3':
+            self.pixels_height = 480
+            self.pixels_width = 640
         if sel == '1:1':
             self.pixels_height = 512
             self.pixels_width = 512
+        if sel == '3:4':
+            self.pixels_height = 640
+            self.pixels_width = 480
         if sel == '2:3': # ish
             self.pixels_height = 704
             self.pixels_width = 448
         if sel == '1:2':
             self.pixels_height = 768
             self.pixels_width = 384
+        if sel == 'original':
+            self.pixels_width, self.pixels_height = self.original_image_sizes()
         await interaction.response.defer()
 
     @discord.ui.select(placeholder=RIFF_STRENGTH_PLACEHOLDER_MESSAGE, row=3,
