@@ -243,9 +243,10 @@ def check_safety(img_loc):
         _, has_nsfw_concept = safety_checker(
             images=[img_to_tensor(img)],
             clip_input=safety_checker_input.pixel_values)
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
+        return False
     return has_nsfw_concept[0]
 
 
@@ -1609,7 +1610,7 @@ async def on_message(message):
         message.clean_content.startswith('>riff '):
         msg_split = message.clean_content.split(' ')
         if len(msg_split) < 3:
-            message.channel.send('Riff requires at least two arguments')
+            await message.channel.send('Riff requires at least two arguments')
             return
 
         docarray_id = msg_split[1]
@@ -1728,7 +1729,9 @@ async def on_message(message):
             try:
                 image = Image.open(BytesIO(image_bytes))
             except Exception:
-                message.channel.send(
+                import traceback
+                traceback.print_exc()
+                await message.channel.send(
                     f'Could not load image file for attachment {message.attachments[0].filename}')
                 return
 
@@ -1920,7 +1923,7 @@ async def on_message(message):
         message.clean_content.startswith('>upscale '):
         msg_split = message.clean_content.split(' ')
         if len(msg_split) < 3:
-            message.channel.send('Riff requires at least two arguments')
+            await message.channel.send('Upscale requires at least two arguments')
             return
 
         docarray_id = msg_split[1]
@@ -1944,7 +1947,7 @@ async def on_message(message):
             try:
                 image = Image.open(BytesIO(image_bytes))
             except Exception:
-                message.channel.send(f'Could not load image file for attachment {i}')
+                await message.channel.send(f'Could not load image file for attachment {i}')
                 continue
 
             image = resize_image(image).convert('RGB')
