@@ -11,7 +11,7 @@ import sys
 import time
 
 from io import BytesIO
-from typing import Optional, Union
+from typing import Any, Optional, Union
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -365,6 +365,25 @@ async def check_subprompt_token_length(
                 'or break into multiple weighted subprompts.')
             return False
     return True
+
+
+def tweak_docarray_tags_request(
+    docarray_id: str,
+    kvs: dict[str, Any],
+):
+    '''
+    Load a DocArray, tweaks the request tag, then save it.
+    '''
+    docarray_loc = DOCARRAY_LOCATION_FN(docarray_id)
+    doc_arr = DocumentArray.load_binary(
+        docarray_loc, protocol='protobuf', compress='lz4'
+    )
+    for doc in doc_arr:
+        if 'request' in doc.tags and isinstance(doc.tags['request'], dict):
+            doc.tags['request'] = { **doc.tags['request'], **kvs }
+
+    doc_arr.save_binary(docarray_loc, protocol='protobuf',
+        compress='lz4')
 
 
 intents = discord.Intents(
@@ -884,6 +903,9 @@ async def _image(
             raise Exception(err)
         image_loc = output['image_loc']
         short_id = output['id']
+        tweak_docarray_tags_request(short_id, {
+            'user_id': user.id,
+        })
         seeds = output.get('seeds', None)
 
         file = to_discord_file_and_maybe_check_safety(image_loc)
@@ -1072,6 +1094,10 @@ async def _riff(
             raise Exception(err)
         image_loc = output['image_loc']
         short_id = output['id']
+        tweak_docarray_tags_request(short_id, {
+            'original_image': docarray_id,
+            'user_id': user.id,
+        })
 
         file = to_discord_file_and_maybe_check_safety(image_loc)
         btns = FourImageButtons(message_id=work_msg.id, idx_parent=idx,
@@ -1358,6 +1384,9 @@ async def _interpolate(
             raise Exception(err)
         image_loc = output['image_loc']
         short_id = output['id']
+        tweak_docarray_tags_request(short_id, {
+            'user_id': user.id,
+        })
 
         file = to_discord_file_and_maybe_check_safety(image_loc)
         work_msg = await work_msg.edit(
