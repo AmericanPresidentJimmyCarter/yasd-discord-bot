@@ -1,15 +1,23 @@
 from typing import Optional
 
 
-def remove_quotes_from_cmd_kwargs(cmd_kwargs):
+def remove_quotes_from_cmd_kwargs(
+    cmd_kwargs: str,
+    false_statement_to_include: Optional[list[str]]=None,
+) -> str:
     split = cmd_kwargs.split(',')
     keywordarg_list = []
     for keywordarg in split:
         as_pair = keywordarg.split('=')
         if as_pair[1].startswith('\'') and as_pair[1].endswith('\''):
             as_pair[1] = as_pair[1][1:-1]
-        if as_pair[1] == 'False':
+        if as_pair[1].startswith('"') and as_pair[1].endswith('"'):
+            as_pair[1] = as_pair[1][1:-1]
+        if as_pair[1] == 'False' and false_statement_to_include is None:
             continue
+        if as_pair[1] == 'False' and false_statement_to_include is not None:
+            if as_pair[0] not in false_statement_to_include:
+                continue
         keywordarg_list.append(f'{as_pair[0]}={as_pair[1]}')
     return ', '.join(keywordarg_list)
 
@@ -156,7 +164,8 @@ def serialize_interpolate_request(
         options += f'{width=},'
     if len(options) > 0 and options[-1] == ',':
         options = f'{options[:-1]}'
-        options = remove_quotes_from_cmd_kwargs(options)
+        options = remove_quotes_from_cmd_kwargs(options,
+            false_statement_to_include='resample_prior')
 
     prompt1 = prompt_un_parenthesis_un_comma(prompt1)
     if '|' in prompt1:
