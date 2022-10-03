@@ -100,9 +100,11 @@ Simply tagging the bot with a message starting with `@bot_name` where `bot_name`
 ### Upscale
 
 - `/upscale <docarray_id> <index>` (slash command)
-- `>upscale <docarray_id> <index>` (direct message command)
+- `>upscale <docarray_id> <index> (foo=bar)` (direct message command)
 
 Upscale an image to 4x the resolution (512x512 -> 2048x2048).
+
+The upscaler itself is selectable using the `upscaler` option. Valid values are SwinIR('swinir'), RealESRGAN 4x('resrgan_4x'), RealESRGAN 4x + Face Fix ('resrgan_4x_face'), RealESRGAN 4x Anime, and no upscale (just return the image, 'no_upscale').
 
 Upscale buttons using the feature are automatically added to all `riff` or `image` commands.
 

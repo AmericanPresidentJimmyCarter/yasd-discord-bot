@@ -187,8 +187,12 @@ def serialize_interpolate_request(
 def serialize_upscale_request(
     docarray_id: str,
     idx: int,
+
+    upscaler: Optional[str]=None,
 ):
     '''
     Serialize an upscale request to '>upscale'.
     '''
+    if upscaler is not None:
+        return f'>upscale {docarray_id} {idx} (upscaler={upscaler})'
     return f'>upscale {docarray_id} {idx}'

@@ -33,7 +33,8 @@ Live now on the LAION Discord Server for you to try!
 
 ## Changelog
 
-- 2022-09-24: Add usage of the [SD concepts library](https://huggingface.co/sd-concepts-library), add subprompts and negative/positive conditioning, add ability to prevent users from making prompts if they have not been on the server long enough, remove the optimized-sd branch since we have now moved to a local `stable-diffusion` branch that is more optimized than that one, 
+- 2022-10-01: Added clipseg to automatically detect and mask images for inpainting, added RealESRGAN upscaler as an alternative to SwinIR.
+- 2022-09-24: Add usage of the [SD concepts library](https://huggingface.co/sd-concepts-library), add subprompts and negative/positive conditioning, add ability to prevent users from making prompts if they have not been on the server long enough, remove the optimized-sd branch since we have now moved to a local `stable-diffusion` branch that is more optimized than that one.
 - 2022-09-11: Add optional NSFW spoiler filter and NSFW wordlist filter. Added the ability to set default steps and queue any quantity of images on a per user basis with a new flag.
 - 2022-09-06: Added the ability to change make images of any size and riff into different sizes ("outriffing").
 - 2022-09-05: The `sd-lite` branch has been merged upstream, so now low VRAM is available with docker images too.
@@ -62,13 +63,9 @@ Python 3 3.9+ with pip and virtualenv installed (Ubuntu 22.04 works great!)
 
 CUDA runtime environment installed
 
-An NVIDIA GPU with >= 16 GB of VRAM (9GB if you disable SwinIR)
+An NVIDIA GPU with >= 7 GB of VRAM
 
-OR
-
-An NVIDIA GPU with >= 5 GB of VRAM using the lite option
-
-If running with a low VRAM GPU, you will not have access to the `>upscale` endpoint as you will run out of RAM.
+If running with a low VRAM GPU, you will not have access to the `>upscale` endpoint as you will run out of RAM. Buying an RTX 3090 or renting a server with one is recommended.
 
 
 ## Installation

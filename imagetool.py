@@ -1,4 +1,5 @@
 import argparse
+import enum
 import json
 import numpy as np
 import os
@@ -28,6 +29,20 @@ DOCARRAY_LOCATION_FN = lambda docarray_id: f'image_docarrays/{docarray_id}.bin'
 IMAGE_LOCATION_FN = lambda sid: f'images/{sid}.png'
 FILE_NAME_IN = f'temp_json/request-{args.suffix}.json'
 FILE_NAME_OUT = f'temp_json/output-{args.suffix}.json'
+UPSCALER_SWINIR = 'swinir'
+UPSCALER_REALESRGAN_4X = 'resrgan_4x'
+UPSCALER_REALESRGAN_4X_FACE = 'resrgan_4x_face'
+UPSCALER_REALESRGAN_4X_ANIME = 'resrgan_4x_anime'
+UPSCALER_NONE = 'no_upscale'
+
+
+class RESRGAN_MODELS(str, enum.Enum):
+    RealESRGAN_x4plus = 'RealESRGAN_x4plus'
+    RealESRNet_x4plus = 'RealESRNet_x4plus'
+    RealESRGAN_x4plus_anime_6B = 'RealESRGAN_x4plus_anime_6B'
+    RealESRGAN_x2plus = 'RealESRGAN_x2plus'
+    RealESR_animevideov3 = 'realesr-animevideov3'
+    RealESR_general_x4v3 = 'realesr-general-x4v3'
 
 
 def document_to_pil(doc):
@@ -492,7 +507,28 @@ with open(FILE_NAME_IN, 'r') as request_json:
             image = document_to_pil(da[idx])
             orig_width, _ = image.size
 
-            upscale = da[idx].post(f'{JINA_SERVER_URL}/upscale')
+            canvas_scale = 4
+            upscale = None
+            upscaler = request.get('upscaler', None)
+            if upscaler is None or upscaler == UPSCALER_SWINIR:
+                upscale = da[idx].post(f'{JINA_SERVER_URL}/upscale')
+            if upscaler in [UPSCALER_REALESRGAN_4X,
+                UPSCALER_REALESRGAN_4X_ANIME, UPSCALER_REALESRGAN_4X_FACE]:
+                realesrgan_params = {
+                    'model_name': RESRGAN_MODELS.RealESRGAN_x4plus.value,
+                    'face_enhance': False,
+                }
+                if upscaler == UPSCALER_REALESRGAN_4X_FACE:
+                    realesrgan_params['face_enhance'] = True
+                if upscaler == UPSCALER_REALESRGAN_4X_ANIME:
+                    realesrgan_params['face_enhance'] = False
+                    realesrgan_params['model_name'] = \
+                        RESRGAN_MODELS.RealESRGAN_x4plus_anime_6B
+                upscale = DocumentArray([da[idx]]).post(f'{JINA_SERVER_URL}/realesrgan',
+                    parameters=realesrgan_params)[0].matches[0]
+            if upscaler == UPSCALER_NONE:
+                canvas_scale = 1
+                upscale = da[idx]
 
             short_id = short_id_generator()
             image_loc = IMAGE_LOCATION_FN(short_id)
@@ -500,7 +536,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
 
             da_upscale = DocumentArray([upscale])
             da_upscale.plot_image_sprites(image_loc,
-                keep_aspect_ratio=True, canvas_size=orig_width*4)
+                keep_aspect_ratio=True, canvas_size=orig_width * canvas_scale)
             image_png = Image.open(image_loc)
             image_jpg = image_png.save(image_loc_jpeg,
                 quality=95, optimize=True, progressive=True)

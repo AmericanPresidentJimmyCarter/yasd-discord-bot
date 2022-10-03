@@ -131,6 +131,11 @@ MIN_IMAGE_HEIGHT_WIDTH = 384
 MAX_IMAGE_HEIGHT_WIDTH = 768
 MAX_MODEL_CLIP_TOKENS_PER_PROMPT = 77
 NUM_IMAGES_MAX = 9
+UPSCALER_SWINIR = 'swinir'
+UPSCALER_REALESRGAN_4X = 'resrgan_4x'
+UPSCALER_REALESRGAN_4X_FACE = 'resrgan_4x_face'
+UPSCALER_REALESRGAN_4X_ANIME = 'resrgan_4x_anime'
+UPSCALER_NONE = 'no_upscale'
 VALID_IMAGE_HEIGHT_WIDTH = { 384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
     704, 736, 768 }
 VALID_TAG_CONCEPTS = {}
@@ -139,16 +144,6 @@ VALID_TAG_CONCEPTS = {}
 def short_id_generator():
     return ''.join(random.choices(string.ascii_lowercase +
         string.ascii_uppercase + string.digits, k=ID_LENGTH))
-
-
-SAMPLER_CHOICES = [
-    app_commands.Choice(name="k_lms", value="k_lms"),
-    app_commands.Choice(name="dpm2", value="dpm2"),
-    app_commands.Choice(name="dpm2_ancestral", value="dpm2_ancestral"),
-    app_commands.Choice(name="heun", value="heun"),
-    app_commands.Choice(name="euler", value="euler"),
-    app_commands.Choice(name="euler_ancestral", value="euler_ancestral"),
-]
 
 HEIGHT_AND_WIDTH_CHOICES = [
     app_commands.Choice(name="512 (Default)", value=512),
@@ -164,6 +159,28 @@ HEIGHT_AND_WIDTH_CHOICES = [
     app_commands.Choice(name="704", value=704),
     app_commands.Choice(name="736", value=736),
     app_commands.Choice(name="768", value=768),
+]
+
+SAMPLER_CHOICES = [
+    app_commands.Choice(name="k_lms", value="k_lms"),
+    app_commands.Choice(name="dpm2", value="dpm2"),
+    app_commands.Choice(name="dpm2_ancestral", value="dpm2_ancestral"),
+    app_commands.Choice(name="heun", value="heun"),
+    app_commands.Choice(name="euler", value="euler"),
+    app_commands.Choice(name="euler_ancestral", value="euler_ancestral"),
+]
+
+UPSCALER_CHOICES = [
+    app_commands.Choice(name="SwinIR (default, photos and art)",
+        value=UPSCALER_SWINIR),
+    app_commands.Choice(name="RealESRGAN (photos and art)",
+        value=UPSCALER_REALESRGAN_4X),
+    app_commands.Choice(name="RealESRGAN Face-Fixing (photos)",
+        value=UPSCALER_REALESRGAN_4X_FACE),
+    app_commands.Choice(name="RealESRGAN Anime (line art and anime)",
+        value=UPSCALER_REALESRGAN_4X_ANIME),
+    app_commands.Choice(name="No Upscale (return original image)",
+        value=UPSCALER_NONE),
 ]
 
 pathlib.Path('./image_docarrays').mkdir(parents=True, exist_ok=True)
@@ -433,14 +450,17 @@ client = YASDClient()
 class FourImageButtons(discord.ui.View):
     RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE = 'Select Riff Aspect Ratio'
     RIFF_STRENGTH_PLACEHOLDER_MESSAGE = 'Select Riff Strength (no effect on outriff)'
+    UPSCALER_PLACEHOLDER_MESSAGE = 'Select Upscaler'
 
-    pixels_height = 512
     idx_parent = None
     message_id = None
+    pixels_height = 512
+    pixels_width = 512
     short_id = None
     short_id_parent = None
     strength = None
-    pixels_width = 512
+    upscaler = None
+
     def __init__(
         self,
         *,
@@ -523,7 +543,8 @@ class FourImageButtons(discord.ui.View):
             for item in fib.children }
         for item_dict in serialized['items']:
             if item_dict['label'] == fib.RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE or \
-                item_dict['label'] == fib.RIFF_STRENGTH_PLACEHOLDER_MESSAGE:
+                item_dict['label'] == fib.RIFF_STRENGTH_PLACEHOLDER_MESSAGE or \
+                item_dict['label'] == fib.UPSCALER_PLACEHOLDER_MESSAGE:
                 sel = mapped_to_label[item_dict['label']]
                 sel.custom_id = item_dict['custom_id']
             else:
@@ -612,6 +633,7 @@ class FourImageButtons(discord.ui.View):
         original_request = da[0].tags.get('request', None)
         if original_request is None:
             await interaction.channel.send('No original request could be found')
+            return
 
         width, height = self.original_image_sizes()
 
@@ -657,12 +679,8 @@ class FourImageButtons(discord.ui.View):
         idx: int,
     ):
         await interaction.response.defer()
-        completed = await _upscale(interaction.channel, interaction.user,
-            self.short_id, idx)
-
-        if completed:
-            button.disabled = True
-            await interaction.message.edit(view=self)
+        await _upscale(interaction.channel, interaction.user,
+            self.short_id, idx, upscaler=self.upscaler)
 
     @discord.ui.button(label="Riff 0", style=discord.ButtonStyle.blurple, row=0,
         custom_id=f'{short_id_generator()}-riff-0')
@@ -808,6 +826,30 @@ class FourImageButtons(discord.ui.View):
         else:
             self.strength = float(selected[0])
         
+        await interaction.response.defer()
+
+    @discord.ui.select(placeholder=UPSCALER_PLACEHOLDER_MESSAGE, row=4,
+        custom_id=f'{short_id_generator()}-upscaler-select',
+        options=[
+            discord.SelectOption(label='SwinIR (default, photos and art)',
+                value=UPSCALER_SWINIR),
+            discord.SelectOption(label='RealESRGAN (photos and art)',
+                value=UPSCALER_REALESRGAN_4X),
+            discord.SelectOption(label='RealESRGAN Face-Fixing (photos)',
+                value=UPSCALER_REALESRGAN_4X_FACE),
+            discord.SelectOption(label='RealESRGAN Anime (line art and anime)',
+                value=UPSCALER_REALESRGAN_4X_ANIME),
+            discord.SelectOption(label='No Upscale (return original image)',
+                value=UPSCALER_NONE),
+        ])
+    async def select_upscaler(self, interaction: discord.Interaction,
+        selection: discord.ui.Select):
+        selected = selection.values
+        if selected[0] is None or selected[0] == 'swinir':
+            self.upscaler = None
+        else:
+            self.upscaler = selected[0]
+
         await interaction.response.defer()
 
 
@@ -1509,6 +1551,8 @@ async def _upscale(
 
     docarray_id: str,
     idx: int,
+
+    upscaler: Optional[str]=None,
 ):
     global currently_fetching_ai_image
     author_id = str(user.id)
@@ -1536,6 +1580,7 @@ async def _upscale(
             'docarray_id': docarray_id,
             'index': idx,
             'type': 'upscale',
+            'upscaler': upscaler,
         }
         nonce = bump_nonce_and_return(author_id)
         with open(JSON_IMAGE_TOOL_INPUT_FILE_FN(author_id, nonce), 'w') as inp:
@@ -1560,7 +1605,7 @@ async def _upscale(
             attachments=[file])
 
         serialized_cmd = serialize_upscale_request(docarray_id=docarray_id,
-            idx=idx)
+            idx=idx, upscaler=upscaler)
         await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
         completed = True
     except Exception as e:
@@ -1578,10 +1623,14 @@ async def _upscale(
     docarray_id='The ID for the bot-generated image you want to upscale',
     idx='The index of the bot generated image you want to upscale',
 )
+@app_commands.choices(
+    upscaler=UPSCALER_CHOICES,
+)
 async def upscale(
     interaction: discord.Interaction,
     docarray_id: str,
     idx: app_commands.Range[int, 0, NUM_IMAGES_MAX-1],
+    upscaler: Optional[app_commands.Choice[str]] = None,
 ):
     await interaction.response.defer(thinking=True)
 
@@ -1590,7 +1639,8 @@ async def upscale(
             await interaction.followup.send('You are not allowed to use this in this channel!')
             return
 
-    await _upscale(interaction.channel, interaction.user, docarray_id, idx)
+    await _upscale(interaction.channel, interaction.user, docarray_id, idx,
+        upscaler=upscaler.value if upscaler is not None else None)
     await interaction.followup.send('Done!')
 
 
@@ -2009,7 +2059,30 @@ async def on_message(message):
         except Exception:
             pass
 
-        await _upscale(message.channel, message.author, docarray_id, idx)
+        upscaler = None
+        if len(msg_split) > 3:
+            parens_idx = msg_split[3].find('(')
+            if parens_idx >= 0:
+                text = msg_split[3][parens_idx:]
+                if len(text) > 0 and text[0] == '(' and text[-1] == ')':
+                    opts = {}
+                    try:
+                        opts = { val.split('=')[0].strip(): val.split('=')[1].strip()
+                            for val in text[1:-1].split(',') }
+                    except IndexError:
+                        pass
+
+                    if 'upscaler' in opts and opts['upscaler'] in [
+                        UPSCALER_NONE,
+                        UPSCALER_REALESRGAN_4X,
+                        UPSCALER_REALESRGAN_4X_ANIME,
+                        UPSCALER_REALESRGAN_4X_FACE,
+                        UPSCALER_SWINIR,
+                    ]:
+                        upscaler = opts['upscaler']
+
+        await _upscale(message.channel, message.author, docarray_id, idx,
+            upscaler=upscaler)
         return
     elif len(message.mentions) == 1 and \
         message.mentions[0].id == client.user.id and \
