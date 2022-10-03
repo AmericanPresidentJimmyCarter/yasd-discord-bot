@@ -385,6 +385,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                     da = DocumentArray([_d])
                     params_copy = deepcopy(params)
                     params_copy['num_images'] = 1
+                    params_copy['seed'] = random.randint(0, 2 ** 32 - 1)
                     params_copy['strength'] = _strength
                     if _strength != FINAL_STAGE:
                         da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
@@ -400,6 +401,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                     for _ in range(iterations - 1):
                         params_copy = deepcopy(params)
                         params_copy['num_images'] = 1
+                        params_copy['seed'] = random.randint(0, 2 ** 32 - 1)
                         da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
                             parameters=params_copy)[0].matches
 
