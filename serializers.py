@@ -84,6 +84,7 @@ def serialize_riff_request(
     iterations: Optional[int]=None,
     latentless: bool=False,
     prompt: Optional[str]=None,
+    prompt_mask: Optional[str]=None,
     resize: bool=False,
     sampler: Optional[str]=None,
     scale: Optional[float]=None,
@@ -105,6 +106,9 @@ def serialize_riff_request(
     if prompt is not None:
         prompt = prompt_un_parenthesis_un_comma(prompt, uncomma=True)
         options += f'{prompt=},'
+    if prompt_mask is not None:
+        prompt_mask = prompt_un_parenthesis_un_comma(prompt_mask, uncomma=True)
+        options += f'{prompt_mask=},'
     if resize is True:
         options += f'{resize=},'
     if sampler is not None:

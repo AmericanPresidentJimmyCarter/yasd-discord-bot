@@ -190,8 +190,27 @@ def write_button_store():
         json.dump(button_store_dict, bs)
 
 
-def resize_image(image):
-    w, h = image.size
+def preserve_transparency_resize(img: Image, size: tuple[int, int]) -> Image:
+    '''
+    By default PIL resize destroys alpha channel information, so when doing
+    a resize for an image mask through an alpha channel we have to do things
+    a little differently.
+    '''
+    bands = img.split()
+    if len(bands) == 4:
+        bands = [
+            b.resize(size, Image.LANCZOS)
+                if i < 3
+                else b.resize(size, Image.NEAREST)
+            for i, b in enumerate(bands)
+        ]
+        return Image.merge('RGBA', bands)
+
+    return img.resize(size, resample=Image.LANCZOS)
+
+
+def resize_image(img: Image) -> Image:
+    w, h = img.size
     ratio = float(w) / float(h)
     
     w = MAX_IMAGE_HEIGHT_WIDTH
@@ -207,7 +226,7 @@ def resize_image(image):
             w = MIN_IMAGE_HEIGHT_WIDTH
         h = MAX_IMAGE_HEIGHT_WIDTH
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-    return image.resize((w, h), resample=Image.LANCZOS)
+    return preserve_transparency_resize(img, (w, h))
 
 
 def document_to_pil(doc):
@@ -228,6 +247,7 @@ def img_to_tensor(img):
     import torch
     w, h = img.size
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+    img = img.convert('RGB')
     img = img.resize((w, h), resample=Image.LANCZOS)
     img = np.array(img).astype(np.float32) / 255.0
     img = img[None].transpose(0, 3, 1, 2)
@@ -237,7 +257,7 @@ def img_to_tensor(img):
 
 def check_safety(img_loc):
     try:
-        img = Image.open(img_loc).convert("RGB")
+        img = Image.open(img_loc)
         safety_checker_input = safety_feature_extractor(img,
             return_tensors="pt")
         _, has_nsfw_concept = safety_checker(
@@ -540,6 +560,7 @@ class FourImageButtons(discord.ui.View):
         )
 
         latentless = False
+        prompt_mask = None
         resize = False
         sampler = None
         scale = None
@@ -555,6 +576,7 @@ class FourImageButtons(discord.ui.View):
         if original_request is not None and \
             original_request['api'] == 'stablediffuse':
             latentless = original_request['latentless']
+            prompt_mask = original_request.get('prompt_mask', None)
             resize = original_request.get('resize', False)
             sampler = original_request['sampler']
             scale = original_request['scale']
@@ -568,6 +590,7 @@ class FourImageButtons(discord.ui.View):
         await _riff(interaction.channel, interaction.user, self.short_id, idx,
             height=self.pixels_height,
             latentless=latentless,
+            prompt_mask=prompt_mask,
             resize=resize,
             sampler=sampler,
             scale=scale,
@@ -593,7 +616,7 @@ class FourImageButtons(discord.ui.View):
         width, height = self.original_image_sizes()
 
         if original_request['api'] == 'txt2img':
-            prompt = da[0].tags['text']
+            prompt = da[0].text
             sampler = original_request['sampler']
             scale = original_request['scale']
             steps = int(original_request['steps'])
@@ -605,8 +628,10 @@ class FourImageButtons(discord.ui.View):
                 steps=steps,
                 width=width)
         if original_request['api'] == 'stablediffuse':
-            resize = original_request.get('resize', False)
             latentless = original_request['latentless']
+            prompt = da[0].text
+            prompt_mask = original_request.get('prompt_mask', None)
+            resize = original_request.get('resize', False)
             sampler = original_request['sampler']
             scale = original_request['scale']
             steps = int(original_request['steps'])
@@ -617,6 +642,7 @@ class FourImageButtons(discord.ui.View):
                 self.short_id_parent, self.idx_parent,
                 height=height,
                 latentless=latentless,
+                prompt_mask=prompt_mask,
                 resize=resize,
                 sampler=sampler,
                 scale=scale,
@@ -1013,6 +1039,7 @@ async def _riff(
     iterations: Optional[int]=None,
     latentless: bool=False,
     prompt: Optional[str]=None,
+    prompt_mask: Optional[str]=None,
     resize: bool=False,
     sampler: Optional[str]=None,
     scale: Optional[float]=None,
@@ -1068,6 +1095,7 @@ async def _riff(
             'iterations': iterations,
             'latentless': bool(latentless),
             'prompt': prompt,
+            'prompt_mask': prompt_mask,
             'resize': bool(resize),
             'sampler': sampler,
             'scale': scale,
@@ -1116,6 +1144,7 @@ async def _riff(
             iterations=iterations,
             latentless=bool(latentless),
             prompt=prompt,
+            prompt_mask=prompt_mask,
             resize=bool(resize),
             sampler=sampler,
             scale=scale,
@@ -1142,6 +1171,7 @@ async def _riff(
     iterations='Number of diffusion iterations (1 to 16, default=1)',
     latentless='Do not compute latent embeddings from original image (default=False)',
     prompt='Prompt, which overrides the original prompt for the image (default=None)',
+    prompt_mask='Prompt to generate a mask to inpaint one, add "not " prefix to invert (default=None)',
     resize='Resize the image when adjusting width/height instead of attempting outriff (default=False)',
     sampler='Which sampling algorithm to use (k_lms, ddim, dpm2, dpm2_ancestral, heun, euler, or euler_ancestral. default=k_lms)',
     scale='Conditioning scale for prompt (1.0 to 50.0, default=7.5)',
@@ -1164,6 +1194,7 @@ async def riff(
     iterations: Optional[app_commands.Range[int, MIN_ITERATIONS, MAX_ITERATIONS]] = None,
     latentless: Optional[bool]=False,
     prompt: Optional[str]=None,
+    prompt_mask: Optional[str]=None,
     resize: Optional[bool]=False,
     sampler: Optional[app_commands.Choice[str]] = None,
     scale: Optional[app_commands.Range[float, MIN_SCALE, MAX_SCALE]] = None,
@@ -1184,6 +1215,7 @@ async def riff(
         iterations=iterations,
         latentless=bool(latentless),
         prompt=prompt,
+        prompt_mask=prompt_mask,
         resize=bool(resize),
         sampler=sampler.value if sampler is not None else None,
         scale=scale,
@@ -1206,6 +1238,7 @@ async def riff(
     height='Height of the image (default=512)',
     iterations='Number of diffusion iterations (1 to 16, default=1)',
     latentless='Do not compute latent embeddings from original image (default=False)',
+    prompt_mask='Prompt to generate a mask to inpaint one (default=None)',
     resize='Resize the image when adjusting width/height instead of attempting outriff (default=False)',
     sampler='Which sampling algorithm to use (k_lms, ddim, dpm2, dpm2_ancestral, heun, euler, or euler_ancestral. default=k_lms)',
     scale='Conditioning scale for prompt (1.0 to 50.0, default=7.5)',
@@ -1227,6 +1260,7 @@ async def image2image(
     height: Optional[app_commands.Choice[int]] = None,
     iterations: Optional[app_commands.Range[int, MIN_ITERATIONS, MAX_ITERATIONS]] = None,
     latentless: Optional[bool]=False,
+    prompt_mask: Optional[str]=None,
     resize: Optional[bool]=False,
     sampler: Optional[app_commands.Choice[str]] = None,
     scale: Optional[app_commands.Range[float, MIN_SCALE, MAX_SCALE]] = None,
@@ -1256,7 +1290,7 @@ async def image2image(
 
     image_fn = IMAGE_LOCATION_FN(short_id)
     da_fn = DOCARRAY_LOCATION_FN(short_id)
-    image = resize_image(image).convert('RGB')
+    image = resize_image(image)
     image.save(image_fn, format='PNG')
 
     buffered = BytesIO()
@@ -1283,6 +1317,7 @@ async def image2image(
         iterations=iterations,
         latentless=bool(latentless),
         prompt=prompt,
+        prompt_mask=prompt_mask,
         resize=bool(resize),
         sampler=sampler.value if sampler is not None else None,
         scale=scale,
@@ -1660,6 +1695,7 @@ async def on_message(message):
         iterations = None
         latentless = False
         prompt = None
+        prompt_mask = None
         resize = False
         sampler = None
         scale = None
@@ -1684,6 +1720,8 @@ async def on_message(message):
                     pass
             if 'prompt' in opts:
                 prompt = opts['prompt']
+            if 'prompt_mask' in opts:
+                prompt_mask = opts['prompt_mask']
             if 'iterations' in opts:
                 try:
                     iterations_int = int(opts['iterations'])
@@ -1738,6 +1776,7 @@ async def on_message(message):
             iterations=iterations,
             latentless=bool(latentless),
             prompt=prompt,
+            prompt_mask=prompt_mask,
             resize=resize,
             sampler=sampler,
             scale=scale,
@@ -1767,11 +1806,12 @@ async def on_message(message):
                     f'Could not load image file for attachment {message.attachments[0].filename}')
                 return
 
-            image = resize_image(image).convert('RGB')
+            image = resize_image(image)
             image.save(image_fn, format='PNG')
 
             buffered = BytesIO()
             image.save(buffered, format='PNG')
+            print('image mode', image.mode)
             _d = Document(
                 blob=buffered.getvalue(),
                 mime_type='image/png',
@@ -1788,6 +1828,7 @@ async def on_message(message):
 
         iterations = None
         latentless = False
+        prompt_mask = None
         resize = False
         sampler = None
         scale = None
@@ -1817,6 +1858,8 @@ async def on_message(message):
                     latentless = True
                 if 'resize' in opts:
                     resize = True
+                if 'prompt_mask' in opts:
+                    prompt_mask = opts['prompt_mask']
                 if 'sampler' in opts:
                     sampler = opts['sampler']
                 if 'scale' in opts:
@@ -1854,6 +1897,7 @@ async def on_message(message):
             latentless=latentless,
             prompt=prompt,
             resize=resize,
+            prompt_mask=prompt_mask,
             sampler=sampler,
             scale=scale,
             seed=seed,
@@ -1982,7 +2026,7 @@ async def on_message(message):
                 await message.channel.send(f'Could not load image file for attachment {i}')
                 continue
 
-            image = resize_image(image).convert('RGB')
+            image = resize_image(image)
             image.save(image_fn, format='PNG')
 
             buffered = BytesIO()
@@ -2021,7 +2065,10 @@ async def on_ready():
     # any buttons that are more than 48 hours old.
     for view_dict in tqdm(button_store_dict[BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY]):
         if view_dict['time'] >= forty_eight_hours_ago:
-            view = FourImageButtons.from_serialized(view_dict)
+            try:
+                view = FourImageButtons.from_serialized(view_dict)
+            except KeyError:
+                continue
             client.add_view(view, message_id=view_dict['message_id'])
 
     print('Bot is alive')

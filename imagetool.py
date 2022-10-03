@@ -55,6 +55,7 @@ def strip_square(s):
 
 
 def shuffle_by_lines_and_blur(img: Image, sz: tuple[int], horizontal=True):
+    img = img.convert('RGB')
     img = img.resize(sz)
     if not horizontal:
         img = img.rotate(90, expand=True)
@@ -99,7 +100,7 @@ def resize_with_padding(img, expected_size):
         delta_height - pad_height,
     )
     expanded = ImageOps.expand(img_thumb, padding)
-    noised = Image.new('RGB', expanded.size)
+    noised = Image.new(img.mode, expanded.size)
     pixels = noised.load()
     for x in range(noised.size[0]):
         for y in range(noised.size[1]):
@@ -297,6 +298,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
             orig_height = None
             orig_image = None
             orig_prompt = None
+
             if not request.get('from_discord', False):
                 docarray_id = request['docarray_id']
                 idx = request['index']
@@ -339,6 +341,16 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 ).convert_blob_to_datauri()
                 _d.text = orig_prompt
                 da = DocumentArray([_d])
+
+            if request.get('prompt_mask', None) is not None:
+                da[0].text = request['prompt_mask']
+                mask_params = { 'invert': False }
+                if request['prompt_mask'][0:4] == 'not ':
+                    mask_params['invert'] = True
+                masked = DocumentArray([da[0]]).post(
+                    f'{JINA_SERVER_URL}/segment', parameters=mask_params)[0].matches
+                masked[0].text = orig_prompt
+                da = masked
 
             params = {'num_images': 4}
             if request.get('height', None) is not None:
@@ -411,6 +423,9 @@ with open(FILE_NAME_IN, 'r') as request_json:
             short_id = short_id_generator()
             image_loc = IMAGE_LOCATION_FN(short_id)
             docarray_loc = DOCARRAY_LOCATION_FN(short_id)
+
+            tweak_docarray_tags_request(diffused_da, 'prompt_mask',
+                request.get('prompt_mask', None))
 
             tweak_docarray_tags_request(diffused_da, 'resize',
                 request.get('resize', False))
