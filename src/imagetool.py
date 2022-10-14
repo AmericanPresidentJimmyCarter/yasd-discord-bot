@@ -5,6 +5,7 @@ import numpy as np
 import os
 import random
 import string
+import sys
 import traceback
 
 from copy import deepcopy
@@ -15,157 +16,43 @@ from urllib.request import urlopen
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
 from docarray import Document, DocumentArray
 
+
+from constants import (
+    DOCARRAY_LOCATION_FN,
+    IMAGE_LOCATION_FN,
+    IMAGE_STORAGE_FOLDER,
+    RESRGAN_MODELS,
+    TEMP_JSON_STORAGE_FOLDER,
+    UPSCALER_NONE,
+    UPSCALER_REALESRGAN_4X,
+    UPSCALER_REALESRGAN_4X_ANIME,
+    UPSCALER_REALESRGAN_4X_FACE,
+    UPSCALER_SWINIR,
+)
+
+from util import (
+    document_to_pil,
+    resize_with_padding,
+    short_id_generator,
+    strip_square,
+    tweak_docarray_tags,
+)
+
+
 # You may need to set this environmental variable.
 ENV_SERVER_URL = 'DALLE_FLOW_SERVER'
 JINA_SERVER_URL = os.environ.get(ENV_SERVER_URL, False) or \
     'grpc://127.0.0.1:51005'
-ID_LENGTH = 12
 
 parser = argparse.ArgumentParser()
 parser.add_argument('suffix', help='Input/output file suffix')
 args = parser.parse_args()
 
-DOCARRAY_LOCATION_FN = lambda docarray_id: f'image_docarrays/{docarray_id}.bin'
-IMAGE_LOCATION_FN = lambda sid: f'images/{sid}.png'
-FILE_NAME_IN = f'temp_json/request-{args.suffix}.json'
-FILE_NAME_OUT = f'temp_json/output-{args.suffix}.json'
-UPSCALER_SWINIR = 'swinir'
-UPSCALER_REALESRGAN_4X = 'resrgan_4x'
-UPSCALER_REALESRGAN_4X_FACE = 'resrgan_4x_face'
-UPSCALER_REALESRGAN_4X_ANIME = 'resrgan_4x_anime'
-UPSCALER_NONE = 'no_upscale'
+FILE_NAME_IN = f'{TEMP_JSON_STORAGE_FOLDER}/request-{args.suffix}.json'
+FILE_NAME_OUT = f'{TEMP_JSON_STORAGE_FOLDER}/output-{args.suffix}.json'
 
+output: dict[str, Any] = {}
 
-class RESRGAN_MODELS(str, enum.Enum):
-    RealESRGAN_x4plus = 'RealESRGAN_x4plus'
-    RealESRNet_x4plus = 'RealESRNet_x4plus'
-    RealESRGAN_x4plus_anime_6B = 'RealESRGAN_x4plus_anime_6B'
-    RealESRGAN_x2plus = 'RealESRGAN_x2plus'
-    RealESR_animevideov3 = 'realesr-animevideov3'
-    RealESR_general_x4v3 = 'realesr-general-x4v3'
-
-
-def document_to_pil(doc):
-    uri_data = urlopen(doc.uri)
-    return Image.open(BytesIO(uri_data.read()))
-
-
-def short_id_generator():
-    return ''.join(random.choices(string.ascii_lowercase +
-        string.ascii_uppercase + string.digits, k=ID_LENGTH))
-
-
-def strip_square(s):
-    ret = ''
-    skip1c = 0
-    skip2c = 0
-    for i in s:
-        if i == '[':
-            skip1c += 1
-        elif i == ']' and skip1c > 0:
-            skip1c -= 1
-        elif skip1c == 0 and skip2c == 0:
-            ret += i
-    return ret
-
-
-def shuffle_by_lines_and_blur(img: Image, sz: tuple[int], horizontal=True):
-    img = img.convert('RGB')
-    img = img.resize(sz)
-    if not horizontal:
-        img = img.rotate(90, expand=True)
-    channel_count = len(img.getbands())
-    img_arr = np.reshape(img, (img.height, img.width, channel_count))
-    channels = [img_arr[:,:,x] for x in range(channel_count)]
-    random_perm = np.random.permutation(img.height)
-    shuffled_img_arr = np.dstack([x[random_perm, :] for x in channels]).astype(np.uint8)
-    shuffled_img = Image.fromarray(shuffled_img_arr)
-    shuffled_img = shuffled_img.filter(ImageFilter.GaussianBlur(radius = 24))
-    if not horizontal:
-       shuffled_img = shuffled_img.rotate(-90, expand=True)
-    return shuffled_img
-
-
-def mono_gradient(draw: ImageDraw, offset: int, sz: tuple[int], fr: int, to:int,
-    horizontal: bool=True):
-    def interpolate(f_co, t_co, interval):
-        det_co = (t_co - f_co) / interval
-        for i in range(interval):
-            yield round(f_co + det_co * i)
-
-    for i, color in enumerate(interpolate(fr, to, sz[0])):
-        if horizontal:
-            draw.line([(i + offset, 0), (i + offset, sz[1])], color, width=1)
-        else: 
-            draw.line([(0, i + offset), (sz[0], i + offset)], color, width=1)
-
-
-def resize_with_padding(img, expected_size):
-    img_thumb = img.copy()
-    img_thumb.thumbnail(expected_size)
-    
-    delta_width = expected_size[0] - img_thumb.size[0]
-    delta_height = expected_size[1] - img_thumb.size[1]
-    pad_width = delta_width // 2
-    pad_height = delta_height // 2
-    padding = (
-        pad_width,
-        pad_height,
-        delta_width - pad_width,
-        delta_height - pad_height,
-    )
-    expanded = ImageOps.expand(img_thumb, padding)
-    noised = Image.new(img.mode, expanded.size)
-    pixels = noised.load()
-    for x in range(noised.size[0]):
-        for y in range(noised.size[1]):
-            pixels[x, y] = (
-                random.randint(0, 255),
-                random.randint(0, 255),
-                random.randint(0, 255),
-            )
-
-    mask = Image.new('L', expanded.size, 0)
-    draw = ImageDraw.Draw(mask)
-
-    # Apply gradient overlays.
-    need_horiz = expanded.size[0] > img.size[0]
-    need_vert = expanded.size[1] > img.size[1]
-
-    blend = Image.new('L', expanded.size, 48)
-    if need_horiz:
-        blurred = shuffle_by_lines_and_blur(img, expanded.size, False)
-        noised = Image.composite(noised, blurred, blend)
-        mono_gradient(draw, expanded.size[0] // 2 - img_thumb.size[0] // 2, (
-            img_thumb.size[0] // 2,
-            expanded.size[1],
-        ), 0, 255)
-        mono_gradient(draw, expanded.size[0] // 2, (
-            img_thumb.size[0] // 2,
-            expanded.size[1],
-        ), 255, 0)
-    if need_vert:
-        blurred = shuffle_by_lines_and_blur(img, expanded.size, False)
-        noised = Image.composite(noised, blurred, blend)
-        mono_gradient(draw, expanded.size[1] // 2 - img_thumb.size[1] // 2, (
-            expanded.size[0],
-            img_thumb.size[1] // 2,
-        ), 0, 255, False)
-        mono_gradient(draw, expanded.size[1] // 2, (
-            expanded.size[0],
-            img_thumb.size[1] // 2,
-        ), 255, 0, False)
-
-    return Image.composite(expanded, noised, mask)
-
-
-def tweak_docarray_tags_request(doc_arr: DocumentArray, key: str, val: Any):
-    for doc in doc_arr:
-        if 'request' in doc.tags and isinstance(doc.tags['request'], dict):
-            doc.tags['request'][key] = val
-
-
-output = {}
 with open(FILE_NAME_IN, 'r') as request_json:
     request = json.load(request_json)
     try:
@@ -239,11 +126,11 @@ with open(FILE_NAME_IN, 'r') as request_json:
             if request.get('width', None) is not None:
                 params['width'] = request['width']
 
-            docs = []
+            docs_pa: list[Document] = []
             for pr in prompts:
-                docs.append(Document(text=pr).post(JINA_SERVER_URL,
+                docs_pa.append(Document(text=pr).post(JINA_SERVER_URL,
                     parameters=params).matches[0])
-            da = DocumentArray(docs)
+            da = DocumentArray(docs_pa)
 
             image = document_to_pil(da[0])
             orig_width, _ = image.size
@@ -279,14 +166,14 @@ with open(FILE_NAME_IN, 'r') as request_json:
             if request.get('width', None) is not None:
                 params['width'] = request['width']
 
-            seeds = []
-            docs = []
+            seeds: list[int] = []
+            docs_ps: list[Document] = []
             for _ in range(9):
-                seeds.append(params['seed'])
-                docs.append(Document(text=prompt).post(JINA_SERVER_URL,
+                seeds.append(int(params['seed']))
+                docs_ps.append(Document(text=prompt).post(JINA_SERVER_URL,
                     parameters=params).matches[0])
                 params['seed'] += 1
-            da = DocumentArray(docs)
+            da = DocumentArray(docs_ps)
             image = document_to_pil(da[0])
             orig_width, _ = image.size
 
@@ -439,10 +326,10 @@ with open(FILE_NAME_IN, 'r') as request_json:
             image_loc = IMAGE_LOCATION_FN(short_id)
             docarray_loc = DOCARRAY_LOCATION_FN(short_id)
 
-            tweak_docarray_tags_request(diffused_da, 'prompt_mask',
+            tweak_docarray_tags(diffused_da, 'prompt_mask',
                 request.get('prompt_mask', None))
 
-            tweak_docarray_tags_request(diffused_da, 'resize',
+            tweak_docarray_tags(diffused_da, 'resize',
                 request.get('resize', False))
 
             diffused_da.plot_image_sprites(output=image_loc, show_index=True,
@@ -532,7 +419,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
 
             short_id = short_id_generator()
             image_loc = IMAGE_LOCATION_FN(short_id)
-            image_loc_jpeg = f'images/{short_id}.jpg'
+            image_loc_jpeg = f'{IMAGE_STORAGE_FOLDER}/{short_id}.jpg'
 
             da_upscale = DocumentArray([upscale])
             da_upscale.plot_image_sprites(image_loc,

@@ -169,7 +169,7 @@ def serialize_interpolate_request(
     if len(options) > 0 and options[-1] == ',':
         options = f'{options[:-1]}'
         options = remove_quotes_from_cmd_kwargs(options,
-            false_statement_to_include='resample_prior')
+            false_statement_to_include=['resample_prior'])
 
     prompt1 = prompt_un_parenthesis_un_comma(prompt1)
     if '|' in prompt1:

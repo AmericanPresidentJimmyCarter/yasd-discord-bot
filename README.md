@@ -125,7 +125,8 @@ pip install -r requirements.txt
 Then you can start the bot with:
 
 ```bash
-python bot.py YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
+cd src
+python -m bot YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
 ```
 
 **Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
@@ -192,7 +193,8 @@ pip install -r requirements.txt
 Then you can start the bot with:
 
 ```bash
-python bot.py YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
+cd src
+python -m bot YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
 ```
 
 **Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
@@ -233,7 +235,8 @@ pip install -r requirements.txt
 Then you can start the bot with:
 
 ```bash
-python bot.py YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
+cd src
+python -m bot YOUR_DISCORD_BOT_TOKEN -g YOUR_GUILD_ID
 ```
 
 **Be sure you have the "Message Content Intent" flag set to be on in your bot settings!**
