@@ -70,7 +70,7 @@ Options:
 - `latentless`: Use a random latent to generate the image, meaning that the prior image is not used at all. May be used to test a prompt without the image while using the same parameters.
 - `prompt`: Prompt the override the prompt saved in the DocArray.
 - `prompt_mask`: Prompt which specifies what portion of the image you want to diffuse. The rest of the image will be untouched.
-- `resize`: If `True`, the image will be scaled instead of outriffed when changing the dimensions.
+- `resize`: If `True`, the image will be scaled instead of outpainted when changing the dimensions.
 - `sampler`: Which sampler to use when creating the image. Some samplers, such as `euler`, may require fewer steps to get good results, while others can have [a dramatic effect](https://i.redd.it/uy2fp799wmj91.jpg) on image generation itself. Defaults to `k_lms`.
 - `scale`: Conditioning scale for prompt (1.0 to 50.0). This is how strongly the prompt conditions the image. Very high scales may induce a saturation like effect. Default 7.5.
 - `seed`: Deterministic seed integer used to generate your images. The seed defines the noise that will be used to generate your image, and will cause reproducible results when reusing seeds. Default random integer.

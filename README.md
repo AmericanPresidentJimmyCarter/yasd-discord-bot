@@ -33,6 +33,7 @@ Live now on the LAION Discord Server for you to try!
 
 ## Changelog
 
+- 2022-10-23: Added support for RunwayML inpainting/outpainting, replacing outriffing. This is now the recommended model.
 - 2022-10-01: Added clipseg to automatically detect and mask images for inpainting, added RealESRGAN upscaler as an alternative to SwinIR.
 - 2022-09-24: Add usage of the [SD concepts library](https://huggingface.co/sd-concepts-library), add subprompts and negative/positive conditioning, add ability to prevent users from making prompts if they have not been on the server long enough, remove the optimized-sd branch since we have now moved to a local `stable-diffusion` branch that is more optimized than that one.
 - 2022-09-11: Add optional NSFW spoiler filter and NSFW wordlist filter. Added the ability to set default steps and queue any quantity of images on a per user basis with a new flag.
@@ -211,7 +212,7 @@ Follow the instructions for [dalle-flow](https://github.com/jina-ai/dalle-flow) 
 
 At this time, if you haven't already, you will need to put the stable diffusion weights into `dalle/stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt`.
 
-Need to download the weights? Go to [Huggingface's repository for the latest version](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original), log in, agree to the terms and conditions, then download `sd-v1-4.ckpt`. Rename that to `model.ckpt` and put it into the location specified above.
+Need to download the weights? Go to [Huggingface's repository for the latest version](https://huggingface.co/runwayml/stable-diffusion-inpainting/blob/main/sd-v1-5-inpainting.ckpt), log in, agree to the terms and conditions, then download `sd-v1-5-inpainting.ckpt`. Rename that to `model.ckpt` and put it into the location specified above.
 
 To start jina with old models disabled when you're all done:
 

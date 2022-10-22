@@ -29,6 +29,7 @@ import actions
 from constants import (
     BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY,
     DOCARRAY_LOCATION_FN,
+    OutpaintingModes,
     UPSCALER_SWINIR,
     UPSCALER_REALESRGAN_4X,
     UPSCALER_REALESRGAN_4X_FACE,
@@ -48,12 +49,14 @@ if TYPE_CHECKING:
 
 class FourImageButtons(discord.ui.View):
     RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE = 'Select Riff Aspect Ratio'
-    RIFF_STRENGTH_PLACEHOLDER_MESSAGE = 'Select Riff Strength (no effect on outriff)'
+    RIFF_STRENGTH_PLACEHOLDER_MESSAGE_OLD = 'Select Riff Strength (no effect on outriff)'
+    RIFF_STRENGTH_PLACEHOLDER_MESSAGE_NEW = 'Select Riff Strength (no effect on outpaint)'
     UPSCALER_PLACEHOLDER_MESSAGE = 'Select Upscaler'
 
     context: 'YASDClient|None' = None
     idx_parent: int|None = None
     message_id: int|None = None
+    outpaint_mode: str|None = None
     pixels_height: int|None = 512
     pixels_width: int|None = 512
     short_id: str|None = None
@@ -67,6 +70,7 @@ class FourImageButtons(discord.ui.View):
         context: 'YASDClient|None'=None,
         idx_parent: int|float|None=None,
         message_id: int|None=None,
+        outpaint_mode: str|None=None,
         short_id: str|None=None,
         short_id_parent: str|None=None,
         strength: float|None=None,
@@ -77,6 +81,7 @@ class FourImageButtons(discord.ui.View):
         self.idx_parent = idx_parent # type: ignore
         if self.idx_parent is not None and type(self.idx_parent) == float:
             self.idx_parent = int(self.idx_parent)
+        self.outpaint_mode = outpaint_mode
         self.message_id = message_id
         self.short_id = short_id
         self.short_id_parent = short_id_parent
@@ -100,6 +105,7 @@ class FourImageButtons(discord.ui.View):
             'height': self.pixels_height,
             'idx_parent': self.idx_parent,
             'message_id': self.message_id,
+            'outpaint_mode': self.outpaint_mode,
             'short_id': self.short_id,
             'short_id_parent': self.short_id_parent,
             'strength': self.strength,
@@ -128,12 +134,14 @@ class FourImageButtons(discord.ui.View):
         '''
         idx_parent = serialized.get('idx_parent', None)
         message_id = serialized['message_id']
+        outpaint_mode = serialized.get('outpaint_mode', None)
         short_id = serialized['short_id']
         short_id_parent = serialized.get('short_id_parent', None)
         strength = serialized.get('strength', None)
         fib = cls(
             idx_parent=idx_parent,
             message_id=message_id,
+            outpaint_mode=outpaint_mode,
             short_id=short_id,
             short_id_parent=short_id_parent,
             strength=strength,
@@ -150,7 +158,8 @@ class FourImageButtons(discord.ui.View):
             for item in fib.children }
         for item_dict in serialized['items']:
             if item_dict['label'] == fib.RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE or \
-                item_dict['label'] == fib.RIFF_STRENGTH_PLACEHOLDER_MESSAGE or \
+                item_dict['label'] == fib.RIFF_STRENGTH_PLACEHOLDER_MESSAGE_OLD or \
+                item_dict['label'] == fib.RIFF_STRENGTH_PLACEHOLDER_MESSAGE_NEW or \
                 item_dict['label'] == fib.UPSCALER_PLACEHOLDER_MESSAGE:
                 sel = mapped_to_label[item_dict['label']]
                 sel.custom_id = item_dict['custom_id']
@@ -190,7 +199,6 @@ class FourImageButtons(discord.ui.View):
         )
 
         latentless = False
-        prompt_mask = None
         resize = False
         sampler = None
         scale = None
@@ -224,6 +232,7 @@ class FourImageButtons(discord.ui.View):
             idx,
             height=self.pixels_height,
             latentless=latentless,
+            outpaint_mode=self.outpaint_mode,
             resize=resize,
             sampler=sampler,
             scale=scale,
@@ -266,6 +275,7 @@ class FourImageButtons(discord.ui.View):
                 width=width)
         if original_request['api'] == 'stablediffuse':
             latentless = original_request['latentless']
+            outpaint_mode = original_request.get('outpaint_mode', None)
             prompt = da[0].text
             prompt_mask = original_request.get('prompt_mask', None)
             resize = original_request.get('resize', False)
@@ -283,6 +293,7 @@ class FourImageButtons(discord.ui.View):
                 height=height,
                 latentless=latentless,
                 prompt_mask=prompt_mask,
+                outpaint_mode=outpaint_mode,
                 resize=resize,
                 sampler=sampler,
                 scale=scale,
@@ -396,10 +407,22 @@ class FourImageButtons(discord.ui.View):
             discord.SelectOption(label='3:4', value='3:4'),
             discord.SelectOption(label='2:3', value='2:3'),
             discord.SelectOption(label='1:2 (portait)', value='1:2'),
+            discord.SelectOption(label='Extend 25% on all sides',
+                value=OutpaintingModes.OUTPAINT_25_ALL.value),
+            discord.SelectOption(label='Extend 25% left',
+                value=OutpaintingModes.OUTPAINT_25_LEFT.value),
+            discord.SelectOption(label='Extend 25% right',
+                value=OutpaintingModes.OUTPAINT_25_RIGHT.value),
+            discord.SelectOption(label='Extend 25% up',
+                value=OutpaintingModes.OUTPAINT_25_UP.value),
+            discord.SelectOption(label='Extend 25% down',
+                value=OutpaintingModes.OUTPAINT_25_DOWN.value),
             discord.SelectOption(label='Original Image Size', value='original'),
         ])
     async def select_aspect_ratio(self, interaction: discord.Interaction,
         selection: discord.ui.Select):
+        (orig_width, orig_height) = self.original_image_sizes()
+        self.outpaint_mode = None
         selected = selection.values
         sel = selected[0]
         if sel == '2:1':
@@ -423,11 +446,22 @@ class FourImageButtons(discord.ui.View):
         if sel == '1:2':
             self.pixels_height = 768
             self.pixels_width = 384
+        if sel in [
+            OutpaintingModes.OUTPAINT_25_ALL,
+            OutpaintingModes.OUTPAINT_25_LEFT,
+            OutpaintingModes.OUTPAINT_25_RIGHT,
+            OutpaintingModes.OUTPAINT_25_UP,
+            OutpaintingModes.OUTPAINT_25_DOWN,
+        ]:
+            self.pixels_width = orig_width
+            self.pixels_height = orig_height
+            self.outpaint_mode = sel
         if sel == 'original':
-            self.pixels_width, self.pixels_height = self.original_image_sizes()
+            self.pixels_width = orig_width
+            self.pixels_height = orig_height
         await interaction.response.defer()
 
-    @discord.ui.select(placeholder=RIFF_STRENGTH_PLACEHOLDER_MESSAGE, row=3,
+    @discord.ui.select(placeholder=RIFF_STRENGTH_PLACEHOLDER_MESSAGE_NEW, row=3,
         custom_id=f'{short_id_generator()}-riff-select-strength',
         options=[
             discord.SelectOption(label='0.75 (default)', value='0.75'),

@@ -60,13 +60,21 @@ SD_CONCEPTS_URL_FN = lambda concept: f'https://huggingface.co/sd-concepts-librar
 VALID_TAG_CONCEPTS: dict[str, Any] = {}
 
 
-class RESRGAN_MODELS(str, enum.Enum):
+class RealESRGANModels(str, enum.Enum):
     RealESRGAN_x4plus = 'RealESRGAN_x4plus'
     RealESRNet_x4plus = 'RealESRNet_x4plus'
     RealESRGAN_x4plus_anime_6B = 'RealESRGAN_x4plus_anime_6B'
     RealESRGAN_x2plus = 'RealESRGAN_x2plus'
     RealESR_animevideov3 = 'realesr-animevideov3'
     RealESR_general_x4v3 = 'realesr-general-x4v3'
+
+
+class OutpaintingModes(str, enum.Enum):
+    OUTPAINT_25_ALL = 'outpaint_25'
+    OUTPAINT_25_LEFT = 'outpaint_25_l'
+    OUTPAINT_25_RIGHT = 'outpaint_25_r'
+    OUTPAINT_25_UP = 'outpaint_25_u'
+    OUTPAINT_25_DOWN = 'outpaint_25_d'
 
 
 UPSCALER_SWINIR = 'swinir'

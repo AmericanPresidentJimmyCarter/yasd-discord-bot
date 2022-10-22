@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import datetime
 import json
+import math
 import os
 import pathlib
 import random
@@ -40,6 +41,7 @@ from constants import (
     MAX_IMAGE_HEIGHT_WIDTH,
     MAX_MODEL_CLIP_TOKENS_PER_PROMPT,
     MIN_IMAGE_HEIGHT_WIDTH,
+    OutpaintingModes,
     REGEX_FOR_TAGS,
     SD_CONCEPTS_URL_FN,
     VALID_TAG_CONCEPTS,
@@ -272,10 +274,204 @@ def resize_image(img: Image) -> Image:
             w = MIN_IMAGE_HEIGHT_WIDTH
         h = MAX_IMAGE_HEIGHT_WIDTH
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+
     return preserve_transparency_resize(img, (w, h))
 
 
+def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
+    '''
+    Resize an image an add a mask for outpainting.
+
+    OUTPAINT_25_ALL = 'outpaint_25'
+    OUTPAINT_25_LEFT = 'outpaint_25_l'
+    OUTPAINT_25_RIGHT = 'outpaint_25_r'
+    OUTPAINT_25_UP = 'outpaint_25_u'
+    OUTPAINT_25_DOWN = 'outpaint_25_d'
+    '''
+    w, h = img.size
+
+    image_expanded_and_masked = None
+    if mode == OutpaintingModes.OUTPAINT_25_ALL:
+        canvas_width = int(math.floor(w * 1.5))
+        canvas_height = int(math.floor(h * 1.5))
+        x1 = int(math.floor((canvas_width - w) / 2))
+        y1 = int(math.floor((canvas_height - h) / 2))
+        image_expanded = Image.new(img.mode, (canvas_width, canvas_height))
+        coords_paste = (
+            x1,
+            y1,
+            x1 + w,
+            y1 + h,
+        )
+        coords_mask = (
+            x1,
+            y1,
+            x1 + w - 1,
+            y1 + h - 1,
+        )
+        image_expanded.paste(img, coords_paste)
+        mask = Image.new('L', image_expanded.size, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.rectangle(coords_mask, 255)
+
+        noised = Image.new(img.mode, image_expanded.size)
+        pixels = noised.load()
+        for x in range(noised.size[0]):
+            for y in range(noised.size[1]):
+                pixels[x, y] = (
+                    random.randint(0, 255),
+                    random.randint(0, 255),
+                    random.randint(0, 255),
+                )
+
+        together = Image.composite(image_expanded, noised, mask)
+        together.putalpha(mask)
+        image_expanded_and_masked = together
+
+    if mode in [
+        OutpaintingModes.OUTPAINT_25_LEFT,
+        OutpaintingModes.OUTPAINT_25_RIGHT,
+        OutpaintingModes.OUTPAINT_25_UP,
+        OutpaintingModes.OUTPAINT_25_DOWN,
+    ]:
+        canvas_width = w
+        canvas_height = h
+        if mode in [OutpaintingModes.OUTPAINT_25_LEFT,
+            OutpaintingModes.OUTPAINT_25_RIGHT]:
+            canvas_width = int(math.floor(w * 1.25))
+        if mode in [OutpaintingModes.OUTPAINT_25_UP,
+            OutpaintingModes.OUTPAINT_25_DOWN]:
+            canvas_height = int(math.floor(h * 1.25))
+
+        coords_paste = None
+        coords_mask = None
+        if mode == OutpaintingModes.OUTPAINT_25_LEFT:
+            coords_paste = (
+                canvas_width - w,
+                0,
+                canvas_width,
+                canvas_height,
+            )
+            coords_mask = (
+                canvas_width - w,
+                0,
+                canvas_width - 1,
+                canvas_height - 1,
+            )
+        if mode == OutpaintingModes.OUTPAINT_25_RIGHT:
+            coords_paste = (
+                0,
+                0,
+                w,
+                canvas_height,
+            )
+            coords_mask = (
+                0,
+                0,
+                w - 1,
+                canvas_height - 1,
+            )
+        if mode == OutpaintingModes.OUTPAINT_25_UP:
+            coords_paste = (
+                0,
+                canvas_height - h,
+                canvas_width,
+                canvas_height,
+            )
+            coords_mask = (
+                0,
+                canvas_height - h,
+                canvas_width - 1,
+                canvas_height - 1,
+            )
+        if mode == OutpaintingModes.OUTPAINT_25_DOWN:
+            coords_paste = (
+                0,
+                0,
+                canvas_width,
+                h,
+            )
+            coords_mask = (
+                0,
+                0,
+                canvas_width - 1,
+                h - 1,
+            )
+
+        image_expanded = Image.new(img.mode, (canvas_width, canvas_height))
+        image_expanded.paste(img, coords_paste)
+        mask = Image.new('L', image_expanded.size, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.rectangle(coords_mask, 255)
+
+        noised = Image.new(img.mode, image_expanded.size)
+        pixels = noised.load()
+        for x in range(noised.size[0]):
+            for y in range(noised.size[1]):
+                pixels[x, y] = (
+                    random.randint(0, 255),
+                    random.randint(0, 255),
+                    random.randint(0, 255),
+                )
+
+        together = Image.composite(image_expanded, noised, mask)
+        together.putalpha(mask)
+        image_expanded_and_masked = together
+
+    return resize_image(image_expanded_and_masked)
+
+
+def resize_with_mask(img: Image, expected_size: tuple[int, int]) -> Image:
+    '''
+    Resize an image and add a mask to any empty portions that have been filled
+    with noise.
+
+    TODO: Remove as outriffing has been deprecated.
+    '''
+    img_thumb = img.copy()
+    img_thumb.thumbnail(expected_size)
+
+    delta_width = expected_size[0] - img_thumb.size[0]
+    delta_height = expected_size[1] - img_thumb.size[1]
+    pad_width = delta_width // 2
+    pad_height = delta_height // 2
+    padding = (
+        pad_width,
+        pad_height,
+        delta_width - pad_width,
+        delta_height - pad_height,
+    )
+    expanded = ImageOps.expand(img_thumb, padding)
+    noised = Image.new(img.mode, expanded.size)
+    pixels = noised.load()
+    for x in range(noised.size[0]):
+        for y in range(noised.size[1]):
+            pixels[x, y] = (
+                random.randint(0, 255),
+                random.randint(0, 255),
+                random.randint(0, 255),
+            )
+
+    mask = Image.new('L', expanded.size, 0)
+    draw = ImageDraw.Draw(mask)
+    inpaint_region_coords = (
+        pad_width,
+        pad_height,
+        expected_size[0] - pad_width - 1,
+        expected_size[1] - pad_height - 1,
+    )
+    draw.rectangle(inpaint_region_coords, 255)
+
+    together = Image.composite(expanded, noised, mask)
+    together.putalpha(mask)
+    return together
+
+
 def resize_with_padding(img: Image, expected_size: tuple[int, int]) -> Image:
+    '''
+    "Outriffing" resize, where we add some noise while expanding the image
+    and blend it in with a gradient.
+    '''
     img_thumb = img.copy()
     img_thumb.thumbnail(expected_size)
     

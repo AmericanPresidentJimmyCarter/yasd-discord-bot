@@ -21,7 +21,8 @@ from constants import (
     DOCARRAY_LOCATION_FN,
     IMAGE_LOCATION_FN,
     IMAGE_STORAGE_FOLDER,
-    RESRGAN_MODELS,
+    OutpaintingModes,
+    RealESRGANModels,
     TEMP_JSON_STORAGE_FOLDER,
     UPSCALER_NONE,
     UPSCALER_REALESRGAN_4X,
@@ -32,7 +33,8 @@ from constants import (
 
 from util import (
     document_to_pil,
-    resize_with_padding,
+    resize_for_outpainting_modes,
+    resize_with_mask,
     short_id_generator,
     strip_square,
     tweak_docarray_tags,
@@ -244,6 +246,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 _d.text = orig_prompt
                 da = DocumentArray([_d])
 
+            masked = None
             if request.get('prompt_mask', None) is not None:
                 da[0].text = request['prompt_mask']
                 mask_params = { 'invert': False }
@@ -279,11 +282,16 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 params['width'] = orig_width
 
             diffused_da = None
+            params_copy = None
+
+            # Outpainting either through arbitrary resizing or by outpainting
+            # modes.
             if not request.get('resize', False) and (
                     params['height'] != orig_height or
                     params['width'] != orig_width
                 ):
-                img_new = resize_with_padding(orig_image,
+                params_copy = deepcopy(params)
+                img_new = resize_with_mask(orig_image,
                     (params['width'], params['height']))
                 buffered = BytesIO()
                 img_new.save(buffered, format='PNG')
@@ -293,23 +301,29 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 ).convert_blob_to_datauri()
                 _d.text = orig_prompt
 
-                # "Not outpainting"
-                FINAL_STAGE = 0.65
-                for _strength in np.linspace(0.15, FINAL_STAGE, 8):
-                    da = DocumentArray([_d])
-                    params_copy = deepcopy(params)
-                    params_copy['num_images'] = 1
-                    params_copy['seed'] = random.randint(0, 2 ** 32 - 1)
-                    params_copy['strength'] = _strength
-                    if _strength != FINAL_STAGE:
-                        da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
-                            parameters=params_copy)[0].matches
-                    else:
-                        params_copy['num_images'] = 4
-                        da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
-                            parameters=params_copy)[0].matches
-                        
-                diffused_da = da
+                da = DocumentArray([_d])
+                diffused_da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
+                    parameters=params_copy)[0].matches
+            elif not request.get('resize', False) and \
+                request.get('outpaint_mode', None) is not None:
+                # Outpainting modes.
+                img_new = resize_for_outpainting_modes(orig_image,
+                    OutpaintingModes(request['outpaint_mode']))
+                (width_new, height_new) = img_new.size
+                params_copy = deepcopy(params)
+                params_copy['width'] = width_new
+                params_copy['height'] = height_new
+                buffered = BytesIO()
+                img_new.save(buffered, format='PNG')
+                _d = Document(
+                    blob=buffered.getvalue(),
+                    mime_type='image/png',
+                ).convert_blob_to_datauri()
+                _d.text = orig_prompt
+
+                da = DocumentArray([_d])
+                diffused_da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
+                    parameters=params_copy)[0].matches
             else:
                 if iterations > 1:
                     for _ in range(iterations - 1):
@@ -326,14 +340,19 @@ with open(FILE_NAME_IN, 'r') as request_json:
             image_loc = IMAGE_LOCATION_FN(short_id)
             docarray_loc = DOCARRAY_LOCATION_FN(short_id)
 
+            tweak_docarray_tags(diffused_da, 'outpaint_mode',
+                request.get('outpaint_mode', None))
+
             tweak_docarray_tags(diffused_da, 'prompt_mask',
                 request.get('prompt_mask', None))
 
             tweak_docarray_tags(diffused_da, 'resize',
                 request.get('resize', False))
 
+            final_width = params_copy['width'] if params_copy is not None else \
+                params['width']
             diffused_da.plot_image_sprites(output=image_loc, show_index=True,
-                keep_aspect_ratio=True, canvas_size=params['width']*2)
+                keep_aspect_ratio=True, canvas_size=final_width * 2)
             diffused_da.save_binary(docarray_loc, protocol='protobuf',
                 compress='lz4')
 
@@ -382,7 +401,6 @@ with open(FILE_NAME_IN, 'r') as request_json:
             output['docarray_loc'] = docarray_loc
             output['id'] = short_id
 
-
         # Upscale
         if request['type'] == 'upscale':
             docarray_id = request['docarray_id']
@@ -402,7 +420,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
             if upscaler in [UPSCALER_REALESRGAN_4X,
                 UPSCALER_REALESRGAN_4X_ANIME, UPSCALER_REALESRGAN_4X_FACE]:
                 realesrgan_params = {
-                    'model_name': RESRGAN_MODELS.RealESRGAN_x4plus.value,
+                    'model_name': RealESRGANModels.RealESRGAN_x4plus.value,
                     'face_enhance': False,
                 }
                 if upscaler == UPSCALER_REALESRGAN_4X_FACE:
@@ -410,7 +428,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 if upscaler == UPSCALER_REALESRGAN_4X_ANIME:
                     realesrgan_params['face_enhance'] = False
                     realesrgan_params['model_name'] = \
-                        RESRGAN_MODELS.RealESRGAN_x4plus_anime_6B
+                        RealESRGANModels.RealESRGAN_x4plus_anime_6B
                 upscale = DocumentArray([da[idx]]).post(f'{JINA_SERVER_URL}/realesrgan',
                     parameters=realesrgan_params)[0].matches[0]
             if upscaler == UPSCALER_NONE:
