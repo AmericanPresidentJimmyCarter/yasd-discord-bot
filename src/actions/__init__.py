@@ -74,11 +74,11 @@ async def send_alert_embed(
         for _i in range(0, len(serialized_cmd), DISCORD_EMBED_MAX_LENGTH)
     ]
     if len(serialized_chunks) == 1:
-        embed.add_field(name="Command Executed", value=serialized_cmd, inline=False)
+        embed.add_field(name='Command Executed', value=serialized_cmd, inline=False)
     else:
         for idx, chunk in enumerate(serialized_chunks):
             embed.add_field(
-                name="Command Executed" if not idx else '',
+                name='Command Executed' if not idx else 'Continued',
                 value=chunk, inline=False)
 
     embed.set_thumbnail(url=work_msg.attachments[0].url)

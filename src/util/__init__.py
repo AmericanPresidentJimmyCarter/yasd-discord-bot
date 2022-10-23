@@ -50,6 +50,21 @@ from constants import (
 
 random.seed()
 
+prompt_parser = re.compile("""
+    (?P<prompt>     # capture group for 'prompt'
+    (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
+    )               # end 'prompt'
+    (?:             # non-capture group
+    :+              # match one or more ':' characters
+    (?P<weight>     # capture group for 'weight'
+    -?\d+(?:\.\d+)? # match positive or negative integer or decimal number
+    )?              # end weight capture group, make optional
+    \s*             # strip spaces after weight
+    |               # OR
+    $               # else, if no ':' then match end of line
+    )               # end non-capture group
+    """, re.VERBOSE)
+
 
 def bump_nonce_and_return(user_image_generation_nonces: dict, user_id: str):
     if user_image_generation_nonces.get(user_id, None) is None:
@@ -111,20 +126,6 @@ async def check_subprompt_token_length(
     if prompt is None or prompt == '':
         return True
 
-    prompt_parser = re.compile("""
-        (?P<prompt>     # capture group for 'prompt'
-        (?:\\\:|[^:])+  # match one or more non ':' characters or escaped colons '\:'
-        )               # end 'prompt'
-        (?:             # non-capture group
-        :+              # match one or more ':' characters
-        (?P<weight>     # capture group for 'weight'
-        -?\d+(?:\.\d+)? # match positive or negative integer or decimal number
-        )?              # end weight capture group, make optional
-        \s*             # strip spaces after weight
-        |               # OR
-        $               # else, if no ':' then match end of line
-        )               # end non-capture group
-        """, re.VERBOSE)
     parsed_prompts = [match.group('prompt').replace('\\:', ':')
         for match in re.finditer(prompt_parser, prompt)]
 
@@ -178,6 +179,50 @@ def img_to_tensor(img: Image) -> 'Tensor':
     img = img[None].transpose(0, 3, 1, 2)
     img = torch.from_numpy(img)
     return 2.*img - 1.
+
+
+def maybe_split_long_prompt_based_on_tokens(prompt: str) -> str:
+    '''
+    Attempt to break up a prompt that is too long by converting to tokens and
+    then splitting the token lists into chunks and attempting to make those into
+    subprompts.
+    '''
+    def chunk(lst, chunk_size):
+        chunk_size = max(1, chunk_size)
+        return (lst[i:i+chunk_size] for i in range(0, len(lst), chunk_size))
+
+    if prompt is None or prompt == '':
+        return prompt
+
+    parsed_prompts = [(
+            match.group('prompt').replace('\\:', ':'),
+            float(match.group('weight') or 1),
+        ) for match in re.finditer(prompt_parser, prompt)]
+
+    tokenizer = CLIPTokenizer(CLIP_TOKENIZER_VOCAB_FN, CLIP_TOKENIZER_MERGES_FN)
+
+    prompt_maybe_cut_up = ''
+    for subprompt_tup in parsed_prompts:
+        subprompt = subprompt_tup[0]
+        weight = subprompt_tup[1]
+        if subprompt is None or subprompt == '':
+            continue
+        as_tokens = tokenizer(subprompt)
+        if as_tokens.get('input_ids', None) is None:
+            return prompt
+        n_tokens = len(as_tokens['input_ids'])
+
+        if n_tokens > MAX_MODEL_CLIP_TOKENS_PER_PROMPT:
+            for tkns in chunk(as_tokens['input_ids'],
+                MAX_MODEL_CLIP_TOKENS_PER_PROMPT-2):
+                decoded = tokenizer.decode(tkns, skip_special_tokens=True)
+                if decoded == '' or decoded is None:
+                    continue
+                prompt_maybe_cut_up += f'{decoded}:{weight} '
+        else:
+            prompt_maybe_cut_up += f'{subprompt}:{weight} '
+
+    return prompt_maybe_cut_up
 
 
 def mono_gradient(

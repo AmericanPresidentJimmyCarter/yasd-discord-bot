@@ -58,6 +58,7 @@ from ui import (
 )
 from util import (
     check_subprompt_token_length,
+    maybe_split_long_prompt_based_on_tokens,
     prompt_contains_nsfw,
     prompt_has_valid_sd_custom_embeddings,
     resize_image,
@@ -144,6 +145,8 @@ async def prompt_check_fn(
     except Exception:
         await channel.send('Sorry, one of your custom embeddings is invalid.')
         return False
+
+    prompt = maybe_split_long_prompt_based_on_tokens(prompt)
 
     if not await check_subprompt_token_length(channel, author_id, prompt):
         return False
