@@ -275,6 +275,13 @@ def resize_image(img: Image) -> Image:
         h = MAX_IMAGE_HEIGHT_WIDTH
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
 
+    # If the image is RGBA and the mask layer is empty, remove it.
+    if img.mode == 'RGBA' and img.split()[-1].getextrema() == (255, 255):
+        img.load()
+        img_temp = Image.new('RGB', img.size, (255, 255, 255))
+        img_temp.paste(img, mask=img.split()[3])
+        img = img_temp
+
     return preserve_transparency_resize(img, (w, h))
 
 
