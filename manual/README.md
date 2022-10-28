@@ -37,12 +37,12 @@ Prompt weighting can be achieved using subprompts by adding a colon and then a w
 By default Stable Diffusion limits you to 77 tokens from the CLIP tokenizer in your prompt. This bot is _not_ limited to that many tokens, and you can use as many as you can fit into the subprompt limit by adding `:1` to the end of each prompt.
 
 Options:
-- `height`: The height of the output in pixels. Min 384, max 768, steps in 64.
+- `height`: The height of the output in pixels. Min 384, max 768, steps in 32.
 - `sampler`: Which sampler to use when creating the image. Some samplers, such as `euler`, may require fewer steps to get good results, while others can have [a dramatic effect](https://i.redd.it/uy2fp799wmj91.jpg) on image generation itself. Defaults to `k_lms`.
 - `scale`: Conditioning scale for prompt (1.0 to 50.0). This is how strongly the prompt conditions the image. Very high scales may induce a saturation like effect. Default 7.5.
 - `seed`: Deterministic seed integer used to generate your images. The seed defines the noise that will be used to generate your image, and will cause reproducible results when reusing seeds. For example, all prompt array iterations use a fixed seed to make all images appear similar to one another.  Default random integer.
 - `seed_search`: When set, a total of 9 images are made by scanning all seeds from `seed` to `seed + 9`. If no seed is set, the default seed `1` is used.
-- `width`: The width of the output in pixels. Min 384, max 768, steps in 64.
+- `width`: The width of the output in pixels. Min 384, max 768, steps in 32.
 
 ### image2image
 - `/image2image <url> <prompt>` (slash command)
@@ -65,7 +65,7 @@ Diffuse an image that was generated in the past or which was uploaded to the bot
 Riff buttons using the feature with default settings are automatically added to all `riff` or `image` commands.
 
 Options:
-- `height`: The height of the output in pixels. Min 384, max 768, steps in 64.
+- `height`: The height of the output in pixels. Min 384, max 768, steps in 32.
 - `iterations`: The number of times to re-diffuse before generating the final four images. The more iterations, the strong the effect. Default is `1` or no extra iterations. Note that iterations are **ignored** when riffing one aspect ratio to another.
 - `latentless`: Use a random latent to generate the image, meaning that the prior image is not used at all. May be used to test a prompt without the image while using the same parameters.
 - `prompt`: Prompt the override the prompt saved in the DocArray.
@@ -75,7 +75,7 @@ Options:
 - `scale`: Conditioning scale for prompt (1.0 to 50.0). This is how strongly the prompt conditions the image. Very high scales may induce a saturation like effect. Default 7.5.
 - `seed`: Deterministic seed integer used to generate your images. The seed defines the noise that will be used to generate your image, and will cause reproducible results when reusing seeds. Default random integer.
 - `strength`: Strength of conditioning (0.01 <= strength <= 0.99). Used to determine how strongly to diffuse the image against the previous state. A strength of 0.99 should effectively eliminate the previous image, while a strength of 0.01 should do almost nothing. Default 0.75. Note that strength is **ignored** when riffing one aspect ratio to another.
-- `width`: The width of the output in pixels. Min 384, max 768, steps in 64.
+- `width`: The width of the output in pixels. Min 384, max 768, steps in 32.
 
 ### Interpolate
 - `/interpolate <prompt 1> <prompt 2>` (slash command)
@@ -83,14 +83,14 @@ Options:
 
 This generates a series of 9 images that start with one prompt and end with another prompt while attempting to sample all the space inbetween. The first image is generated through the same sampling pipeline as text-to-image, while the subsequent images are riffed through this while the latent embeddings are spherically interpolated between the two prompts to produce mid-state images.
 
-- `height`: The height of the output in pixels. Min 384, max 768, steps in 64.
+- `height`: The height of the output in pixels. Min 384, max 768, steps in 32.
 - `prompt 1`: Prompt to start the interpolation from.
 - `prompt 2`: Prompt to interpolate to.
 - `sampler`: Which sampler to use when creating the image. Some samplers, such as `euler`, may require fewer steps to get good results, while others can have [a dramatic effect](https://i.redd.it/uy2fp799wmj91.jpg) on image generation itself. Defaults to `k_lms`.
 - `scale`: Conditioning scale for prompt (1.0 to 50.0). This is how strongly the prompt conditions the image. Very high scales may induce a saturation like effect.  Default 7.5.
 - `seed`: Deterministic seed integer used to generate your images. The seed defines the noise that will be used to generate your image, and will cause reproducible results when reusing seeds. Default random integer.
 - `strength`: Strength of conditioning (0.01 <= strength <= 0.99). Used to determine how strongly to diffuse the image against the previous state. Higher strengths should yield more intense interpolations. Default 0.75.
-- `width`: The width of the output in pixels. Min 384, max 768, steps in 64.
+- `width`: The width of the output in pixels. Min 384, max 768, steps in 32.
 
 ### Upload Images
 - `@bot_name <description>` (direct message command)
