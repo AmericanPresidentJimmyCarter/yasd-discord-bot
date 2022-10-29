@@ -49,7 +49,7 @@ Live now on the LAION Discord Server for you to try!
 
 ## Content advisory
 
-This bot does not come equipped with a NSFW filter for content by default and will make any content out of the box. Please be sure to read and agree with the [license for the weights](https://github.com/CompVis/stable-diffusion/blob/main/LICENSE), as well as the [MIT license](https://en.wikipedia.org/wiki/MIT_License), and abide by all applicable laws and regulations in your respective area.
+This bot does not come equipped with a NSFW filter for content by default and will make any content out of the box. Please be sure to read and agree with the [license for the weights](https://huggingface.co/runwayml/stable-diffusion-inpainting), as well as the [MIT license](https://en.wikipedia.org/wiki/MIT_License), and abide by all applicable laws and regulations in your respective area.
 
 To enable the NSFW filter to automatically add the spoiler tag to any potential NSFW images, use the flag `--nsfw-auto-spoiler`. You must first `pip install -r requirements_nsfw_filter.txt` to get the modules required for this.
 
@@ -90,7 +90,7 @@ Pull the `dalle-flow` docker image with:
 docker pull jinaai/dalle-flow:latest
 ```
 
-Go to [Huggingface's repository for the latest version](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original), log in, agree to the terms and conditions, then download `sd-v1-4.ckpt`. Rename that to `model.ckpt` and then, from that directory, run the following commands:
+Log into Huggingface, agree to [RunwayML's terms of service](https://huggingface.co/runwayml/stable-diffusion-inpainting), go to [RunwayML's repository for the latest version](https://huggingface.co/runwayml/stable-diffusion-inpainting/blob/main/sd-v1-5-inpainting.ckpt), then download `sd-v1-5-inpainting.ckpt`. Rename that to `model.ckpt` and then, from that directory, run the following commands:
 
 ```bash
 mkdir ~/ldm
@@ -152,7 +152,7 @@ git clone https://github.com/jina-ai/dalle-flow
 cd dalle-flow
 ```
 
-Go to [Huggingface's repository for the latest version](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original), log in, agree to the terms and conditions, then download `sd-v1-4.ckpt`. Rename that to `model.ckpt` and then, from that directory, run the following commands:
+Log into Huggingface, agree to [RunwayML's terms of service](https://huggingface.co/runwayml/stable-diffusion-inpainting), go to [RunwayML's repository for the latest version](https://huggingface.co/runwayml/stable-diffusion-inpainting/blob/main/sd-v1-5-inpainting.ckpt), then download `sd-v1-5-inpainting.ckpt`. Rename that to `model.ckpt` and then, from that directory, run the following commands:
 
 ```bash
 mkdir ~/ldm
@@ -212,7 +212,7 @@ Follow the instructions for [dalle-flow](https://github.com/jina-ai/dalle-flow) 
 
 At this time, if you haven't already, you will need to put the stable diffusion weights into `dalle/stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt`.
 
-Need to download the weights? Go to [Huggingface's repository for the latest version](https://huggingface.co/runwayml/stable-diffusion-inpainting/blob/main/sd-v1-5-inpainting.ckpt), log in, agree to the terms and conditions, then download `sd-v1-5-inpainting.ckpt`. Rename that to `model.ckpt` and put it into the location specified above.
+Need to download the weights? Log into Huggingface, agree to [RunwayML's terms of service](https://huggingface.co/runwayml/stable-diffusion-inpainting), go to [RunwayML's repository for the latest version](https://huggingface.co/runwayml/stable-diffusion-inpainting/blob/main/sd-v1-5-inpainting.ckpt), then download `sd-v1-5-inpainting.ckpt`. Rename that to `model.ckpt` and put it into the location specified above.
 
 To start jina with old models disabled when you're all done:
 
