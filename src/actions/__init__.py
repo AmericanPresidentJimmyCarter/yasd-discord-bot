@@ -88,6 +88,9 @@ async def image(
     if steps is None:
         steps = context.cli_args.default_steps # type: ignore
 
+    if sampler is None and context.cli_args.default_sampler: # type: ignore
+        sampler = context.cli_args.default_sampler # type: ignore
+
     short_id = None
     typ = 'prompt'
     if prompt.find('[') != -1 and prompt.find(']') != -1:
@@ -210,6 +213,9 @@ async def riff(
     if steps is None:
         steps = context.cli_args.default_steps # type: ignore
 
+    if sampler is None and context.cli_args.default_sampler: # type: ignore
+        sampler = context.cli_args.default_sampler # type: ignore
+
     if not await check_restricted_to_channel(context, channel):
         return
 
@@ -328,6 +334,9 @@ async def interpolate(
 
     if steps is None:
         steps = context.cli_args.default_steps # type: ignore
+
+    if sampler is None and context.cli_args.default_sampler: # type: ignore
+        sampler = context.cli_args.default_sampler # type: ignore
 
     if not await check_restricted_to_channel(context, channel):
         return

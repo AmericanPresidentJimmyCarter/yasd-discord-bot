@@ -123,6 +123,8 @@ SAMPLER_CHOICES = [
     app_commands.Choice(name="euler", value="euler"),
     app_commands.Choice(name="euler_ancestral", value="euler_ancestral"),
 ]
+VALID_SAMPLERS = ['k_lms', 'dpm2', 'dpm2_ancestral', 'heun', 'euler',
+    'euler_ancestral']
 
 
 UPSCALER_CHOICES = [

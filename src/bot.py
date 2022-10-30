@@ -1,6 +1,7 @@
 import argparse
 import json
 import pathlib
+import sys
 import time
 
 from io import BytesIO
@@ -44,6 +45,7 @@ from constants import (
     UPSCALER_REALESRGAN_4X_FACE,
     UPSCALER_SWINIR,
     VALID_IMAGE_HEIGHT_WIDTH,
+    VALID_SAMPLERS,
 )
 from ui import (
     FourImageButtons,
@@ -60,6 +62,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('token', help='Discord token')
 parser.add_argument('--allow-queue', dest='allow_queue',
     action=argparse.BooleanOptionalAction)
+parser.add_argument('--default-sampler', dest='default_sampler', nargs='?',
+    type=str, help='Default sampler to use', default=None)
 parser.add_argument('--default-steps', dest='default_steps', nargs='?',
     type=int, help='Default number of steps for the sampler', default=50)
 parser.add_argument('--hours-on-server-to-use', dest='hours_needed', nargs='?',
@@ -145,6 +149,11 @@ async def prompt_check_fn(
 
     return prompt
 
+if args.default_sampler is not None and \
+    args.default_sampler not in VALID_SAMPLERS:
+    print(f'Invalid sampler "{args.default_sampler}" was given. Please use one ' +
+        f'of {VALID_SAMPLERS}.')
+    sys.exit(1)
 
 guild = args.guild
 
