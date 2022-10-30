@@ -5,6 +5,7 @@ import discord
 from constants import (
     DISCORD_EMBED_MAX_LENGTH,
     REGEX_FOR_ID,
+    UPSCALER_NONE,
 )
 from serializers import (
     serialize_image_request,
@@ -14,6 +15,7 @@ from serializers import (
 )
 from ui import (
     FourImageButtons,
+    OneImageButtons,
 )
 from util import (
     bump_nonce_and_return,
@@ -179,6 +181,8 @@ async def image(
         await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         await channel.send(f'Got unknown error on prompt "{prompt}": {str(e)}')
     finally:
         complete_request(context, author_id, queue_message)
@@ -304,6 +308,8 @@ async def riff(
             width=width)
         await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         await channel.send(f'Got unknown error on riff "{docarray_id}" index {str(idx)}: {str(e)}')
     finally:
         complete_request(context, author_id, queue_message)
@@ -409,6 +415,8 @@ async def interpolate(
             width=width)
         await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         await channel.send(f'Got unknown error on interpolate `{prompt1}` to `{prompt2}`: {str(e)}')
     finally:
         complete_request(context, author_id, queue_message)
@@ -468,15 +476,26 @@ async def upscale(
             image_loc,
             context.safety_feature_extractor,
             context.safety_checker)
+
+        view = None
+        if upscaler == UPSCALER_NONE:
+            view = OneImageButtons(context=context, message_id=work_msg.id,
+                short_id_parent=docarray_id, idx_parent=idx)
+            view.serialize_to_json_and_store(context.button_store_dict) # type: ignore
+            context.add_view(view, message_id=work_msg.id)
+
         work_msg = await work_msg.edit(
             content=f'Image generation for upscale on `{docarray_id}` index {str(idx)} for <@{author_id}> complete.',
-            attachments=[file])
+            attachments=[file],
+            view=view)
 
         serialized_cmd = serialize_upscale_request(docarray_id=docarray_id,
             idx=idx, upscaler=upscaler)
         await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
         completed = True
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         await channel.send(f'Got unknown error on upscale "{docarray_id}" index {str(idx)}: {str(e)}')
     finally:
         complete_request(context, author_id, queue_message)

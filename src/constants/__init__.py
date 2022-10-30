@@ -18,6 +18,7 @@ REGEX_FOR_ID = re.compile('([0-9a-zA-Z]){12}$')
 ID_LENGTH = 12
 
 BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY = 'four_img_views'
+BUTTON_STORE_ONE_IMAGE_BUTTONS_KEY = 'one_img_views'
 
 JSON_IMAGE_TOOL_INPUT_FILE_FN = lambda uid, nonce: f'../temp_json/request-{uid}_{nonce}.json'
 JSON_IMAGE_TOOL_OUTPUT_FILE_FN = lambda uid, nonce: f'../temp_json/output-{uid}_{nonce}.json'

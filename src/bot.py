@@ -19,6 +19,8 @@ from tqdm import tqdm
 import actions
 from client import YASDClient
 from constants import (
+    BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY,
+    BUTTON_STORE_ONE_IMAGE_BUTTONS_KEY,
     DOCARRAY_LOCATION_FN,
     DOCARRAY_STORAGE_FOLDER,
     HEIGHT_AND_WIDTH_CHOICES,
@@ -49,6 +51,7 @@ from constants import (
 )
 from ui import (
     FourImageButtons,
+    OneImageButtons,
 )
 from util import (
     prompt_contains_nsfw,
@@ -164,8 +167,10 @@ guild = args.guild
 currently_fetching_ai_image: dict[str, Union[str, List[str], bool]] = {}
 user_image_generation_nonces: dict[str, int] = {}
 
-BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY = 'four_img_views'
-button_store_dict: dict[str, list] = { BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY: [] }
+button_store_dict: dict[str, list] = {
+    BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY: [],
+    BUTTON_STORE_ONE_IMAGE_BUTTONS_KEY: [],
+}
 
 
 BUTTON_STORE = f'{TEMP_JSON_STORAGE_FOLDER}/button-store-{str(guild)}.json'
@@ -187,6 +192,10 @@ bs_path = pathlib.Path(BUTTON_STORE)
 if bs_path.is_file():
     with open(bs_path, 'r') as bs:
         button_store_dict = json.load(bs)
+        if BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY not in button_store_dict:
+            button_store_dict[BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY] = []
+        if BUTTON_STORE_ONE_IMAGE_BUTTONS_KEY not in button_store_dict:
+            button_store_dict[BUTTON_STORE_ONE_IMAGE_BUTTONS_KEY] = []
 
 
 intents = discord.Intents(
@@ -1007,15 +1016,18 @@ async def on_message(message):
             clean_content_split = message.clean_content.split(' ')
             if len(clean_content_split) > 1:
                 clean_content = ' '.join(clean_content_split)
-            _d.text = clean_content
+            _d.text = ''
 
             da = DocumentArray([_d])
             da.save_binary(da_fn, protocol='protobuf', compress='lz4')
-            await message.channel.send(f'Attachment {attachment.filename} ({i}) sent by ' +
-                f'<@{str(message.author.id)}> has been uploaded and given ID `{sid}`.' +
-                ' To use this ID in a riff or upscale, just use 0 for the image ' +
-                'index.')
-            await message.channel.send(sid)
+
+            msg = await message.channel.send(f'Attachment {attachment.filename} ({i}) sent by ' +
+                f'<@{str(message.author.id)}> has been uploaded and given ID `{sid}`.')
+            view = OneImageButtons(context=client, message_id=msg.id,
+                short_id_parent=sid, idx_parent=0, prompt='')
+            view.serialize_to_json_and_store(button_store_dict) # type: ignore
+            client.add_view(view, message_id=msg.id)
+            await msg.edit(view=view)
 
 
 @client.event
@@ -1030,10 +1042,17 @@ async def on_ready():
 
     # init the button handler and load up any previously saved buttons. Skip
     # any buttons that are more than reload_last_seconds old.
-    for view_dict in tqdm(button_store_dict[BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY]):
+    for view_dict in tqdm(button_store_dict.get(BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY, [])):
         if view_dict['time'] >= now - reload_last_seconds:
             try:
                 view = FourImageButtons.from_serialized(client, view_dict)
+            except KeyError:
+                continue
+            client.add_view(view, message_id=view_dict['message_id'])
+    for view_dict in tqdm(button_store_dict.get(BUTTON_STORE_ONE_IMAGE_BUTTONS_KEY, [])):
+        if view_dict['time'] >= now - reload_last_seconds:
+            try:
+                view = OneImageButtons.from_serialized(client, view_dict)
             except KeyError:
                 continue
             client.add_view(view, message_id=view_dict['message_id'])
