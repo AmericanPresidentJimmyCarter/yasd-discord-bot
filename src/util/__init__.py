@@ -321,7 +321,18 @@ def prompt_contains_nsfw(
 
     if len(nsfw_wordlist) == 0:
         return False
-    return any(word in prompt.lower() for word in nsfw_wordlist)
+    regex_entries = list(filter(
+        lambda entry: entry[0:2] == 'r/' and entry[-1] == '/',
+        nsfw_wordlist,
+    ))
+    non_regex_entries = list(set(nsfw_wordlist) - set(regex_entries))
+    if len(regex_entries) > 0:
+        for regex_entry in regex_entries:
+            # Strip r/ from beginning and / from end.
+            compiled = re.compile(regex_entry[2:-1])
+            if compiled.match(prompt) is not None:
+                return True
+    return any(word in prompt.lower() for word in non_regex_entries)
 
 
 def prompt_has_valid_sd_custom_embeddings(prompt: str|None):

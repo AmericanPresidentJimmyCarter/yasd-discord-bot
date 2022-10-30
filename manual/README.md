@@ -127,7 +127,7 @@ Upscale buttons using the feature are automatically added to all `riff` or `imag
 
 - `--nsfw-prompt-detection`: Use BERT through detoxify to detect potentially offensive or NSFW prompts.
 
-- `--nsfw-wordlist <wordlist>`:  Reject any prompts if they contain a word within a wordlist. The wordlist should be strings separated by newlines.
+- `--nsfw-wordlist <wordlist>`:  Reject any prompts if they contain a word within a wordlist. The wordlist should be strings separated by newlines. Any strings prefixed with `r/` and suffixed with `/` will be tested as regular expressions instead.
 
 - `--restrict-all-to-channel <channel_id>`: Discord channel ID to restrict all your commands to.
 
