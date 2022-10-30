@@ -1,28 +1,11 @@
-import argparse
-import asyncio
-import datetime
-import json
-import os
-import pathlib
 import random
-import re
-import string
-import sys
 import time
 
-from io import BytesIO
-from typing import TYPE_CHECKING, Any, Optional, Union
-from urllib.error import URLError
-from urllib.request import urlopen
+from typing import TYPE_CHECKING, Any
 
 import discord
-import numpy as np
 
-from PIL import Image
-from discord import app_commands
-from docarray import Document, DocumentArray
-from tqdm import tqdm
-from transformers import CLIPTokenizer
+from docarray import DocumentArray
 
 import actions
 

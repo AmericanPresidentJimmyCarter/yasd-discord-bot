@@ -1,19 +1,14 @@
 import argparse
-import enum
 import json
-import numpy as np
 import os
 import random
-import string
-import sys
 import traceback
 
 from copy import deepcopy
 from io import BytesIO
 from typing import Any
-from urllib.request import urlopen
 
-from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from PIL import Image
 from docarray import Document, DocumentArray
 
 
