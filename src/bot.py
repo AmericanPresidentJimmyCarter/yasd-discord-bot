@@ -1,28 +1,19 @@
 import argparse
-import asyncio
-import datetime
 import json
-import os
 import pathlib
-import random
-import re
-import string
-import sys
 import time
 
 from io import BytesIO
-from typing import Any, Callable, Optional, Union
+from typing import Callable, List, Optional, Union
 from urllib.error import URLError
 from urllib.request import urlopen
 
 import discord
-import numpy as np
 
 from PIL import Image
 from discord import app_commands
 from docarray import Document, DocumentArray
 from tqdm import tqdm
-from transformers import CLIPTokenizer
 
 import actions
 from client import YASDClient
@@ -78,6 +69,13 @@ parser.add_argument('--hours-on-server-to-use', dest='hours_needed', nargs='?',
     required=False)
 parser.add_argument('-g', '--guild', dest='guild',
     help='Discord guild ID', type=int, required=False)
+parser.add_argument('--max-queue',
+    dest='max_queue',
+    type=int,
+    help='The maximum number of simultaneous requests per user',
+    required=False,
+    default=9999,
+)
 parser.add_argument('--nsfw-auto-spoiler', dest='auto_spoiler',
     action=argparse.BooleanOptionalAction)
 parser.add_argument('--nsfw-prompt-detection',
@@ -157,7 +155,7 @@ async def prompt_check_fn(
 guild = args.guild
 
 # In memory k-v stores.
-currently_fetching_ai_image: dict[str, Union[str, bool]] = {}
+currently_fetching_ai_image: dict[str, Union[str, List[str], bool]] = {}
 user_image_generation_nonces: dict[str, int] = {}
 
 BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY = 'four_img_views'
@@ -385,7 +383,7 @@ async def image2image(
         await interaction.followup.send(f'Bad image URL "{url}": {str(e)}!')
         return
     except OSError as e:
-        await interaction.followup.send(f'Failed to parse image!')
+        await interaction.followup.send('Failed to parse image!')
         return
 
     image_fn = IMAGE_LOCATION_FN(short_id)
@@ -708,7 +706,7 @@ async def on_message(message):
             steps=steps,
             strength=strength,
             width=width)
-        return 
+        return
     if isinstance(message.clean_content, str) and \
         message.clean_content.startswith('>image2image'):
         prompt = message.clean_content[13:]

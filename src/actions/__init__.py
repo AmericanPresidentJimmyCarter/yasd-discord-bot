@@ -1,28 +1,6 @@
-import argparse
-import asyncio
-import datetime
-import json
-import os
-import pathlib
-import random
-import re
-import string
-import sys
-import time
-
-from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
-from urllib.error import URLError
-from urllib.request import urlopen
+from typing import TYPE_CHECKING, Optional
 
 import discord
-import numpy as np
-
-from PIL import Image
-from discord import app_commands
-from docarray import Document, DocumentArray
-from tqdm import tqdm
-from transformers import CLIPTokenizer
 
 from constants import (
     DISCORD_EMBED_MAX_LENGTH,
@@ -38,10 +16,11 @@ from ui import (
     FourImageButtons,
 )
 from util import (
+    bump_nonce_and_return,
     check_queue_and_maybe_write_to,
     check_restricted_to_channel,
     check_user_joined_at,
-    bump_nonce_and_return,
+    complete_request,
     seed_from_docarray_id,
     spawn_image_tool_instance,
     to_discord_file_and_maybe_check_safety,
@@ -124,8 +103,9 @@ async def image(
         user):
         return
 
+    queue_message = prompt
     if not await check_queue_and_maybe_write_to(context, channel, author_id,
-        prompt):
+        queue_message):
         return
 
     work_msg = await channel.send(
@@ -198,7 +178,7 @@ async def image(
     except Exception as e:
         await channel.send(f'Got unknown error on prompt "{prompt}": {str(e)}')
     finally:
-        context.currently_fetching_ai_image[author_id] = False # type: ignore
+        complete_request(context, author_id, queue_message)
 
     return short_id
 
@@ -238,8 +218,9 @@ async def riff(
         return
 
     short_id = None
+    queue_message = f'riffs on previous work `{docarray_id}`, index {str(idx)}'
     if not await check_queue_and_maybe_write_to(context, channel, author_id,
-        f'riffs on previous work `{docarray_id}`, index {str(idx)}'):
+        queue_message):
         return
 
     prompt = await context.prompt_check_fn(prompt, author_id, channel) # type: ignore
@@ -318,7 +299,7 @@ async def riff(
     except Exception as e:
         await channel.send(f'Got unknown error on riff "{docarray_id}" index {str(idx)}: {str(e)}')
     finally:
-        context.currently_fetching_ai_image[author_id] = False # type: ignore
+        complete_request(context, author_id, queue_message)
 
     return short_id
 
@@ -350,8 +331,9 @@ async def interpolate(
     if not await check_restricted_to_channel(context, channel):
         return
 
+    queue_message = f'interpolate on prompt {prompt1} to {prompt2}'
     if not await check_queue_and_maybe_write_to(context, channel, author_id,
-        f'interpolate on prompt {prompt1} to {prompt2}'):
+        queue_message):
         return
 
     prompt1 = await context.prompt_check_fn(prompt1, author_id, channel) # type: ignore
@@ -419,7 +401,7 @@ async def interpolate(
     except Exception as e:
         await channel.send(f'Got unknown error on interpolate `{prompt1}` to `{prompt2}`: {str(e)}')
     finally:
-        context.currently_fetching_ai_image[author_id] = False # type: ignore
+        complete_request(context, author_id, queue_message)
 
     return short_id
 
@@ -443,8 +425,9 @@ async def upscale(
         await channel.send(f'Got invalid docarray ID \'{docarray_id}\'')
         return
 
+    queue_message = f'upscale on previous work `{docarray_id}`, index {str(idx)}'
     if not await check_queue_and_maybe_write_to(context, channel, author_id,
-        f'upscale on previous work `{docarray_id}`, index {str(idx)}'):
+        queue_message):
         return
 
     if not await check_user_joined_at(context.cli_args.hours_needed, channel, # type: ignore
@@ -486,6 +469,6 @@ async def upscale(
     except Exception as e:
         await channel.send(f'Got unknown error on upscale "{docarray_id}" index {str(idx)}: {str(e)}')
     finally:
-        context.currently_fetching_ai_image[author_id] = False # type: ignore
+        complete_request(context, author_id, queue_message)
 
     return completed

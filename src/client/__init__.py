@@ -15,7 +15,7 @@ class YASDClient(discord.Client):
     button_store_dict: dict[str, Any]|None = None
     button_store_path: pathlib.Path|None = None
     cli_args: Namespace|None = None
-    currently_fetching_ai_image: dict[str, bool|str]|None = None
+    currently_fetching_ai_image: dict[str, bool|str|list[str]]|None = None
     guild_id: int|None = None
     prompt_check_fn: Callable|None = lambda x: x
     safety_checker: Callable|None = None
@@ -28,7 +28,7 @@ class YASDClient(discord.Client):
         button_store_dict=None,
         button_store_path: pathlib.Path=None,
         cli_args: Namespace=None,
-        currently_fetching_ai_image: dict[str, bool|str]=None,
+        currently_fetching_ai_image: dict[str, bool|str|list[str]]=None,
         guild_id: int|None=None,
         prompt_check_fn: Callable=None,
         safety_checker: Callable=None,

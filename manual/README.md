@@ -121,6 +121,8 @@ Upscale buttons using the feature are automatically added to all `riff` or `imag
 
 - `--hours-on-server-to-use <hours>`: The number of hours a user must have been on the server to use the bot.
 
+- `--max-queue <integer>`: The maximum number of concurrent requests allowed when the `--allow-queue` option is turned on (default is 9999).
+
 - `--nsfw-auto-spoiler`: Automatically add the spoiler tag to any potential NSFW images. Requires you to `pip install -r requirements_nsfw_filter.txt` first, as this requires torch.
 
 - `--nsfw-prompt-detection`: Use BERT through detoxify to detect potentially offensive or NSFW prompts.
