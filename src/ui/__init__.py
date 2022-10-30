@@ -317,23 +317,24 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_riff(interaction, button, 1)
 
-    @discord.ui.button(label="Riff 2", style=discord.ButtonStyle.blurple, row=0,
-        custom_id=f'{short_id_generator()}-riff-2')
-    async def riff_button_2(self, interaction: discord.Interaction,
-        button: discord.ui.Button):
-        inuse = await self.global_shows_in_use(interaction)
-        if inuse:
-            return
-        await self.handle_riff(interaction, button, 2)
 
-    @discord.ui.button(label="Riff 3", style=discord.ButtonStyle.blurple, row=0,
-        custom_id=f'{short_id_generator()}-riff-3')
-    async def riff_button_3(self, interaction: discord.Interaction,
+    @discord.ui.button(label="Upscale 0", style=discord.ButtonStyle.green, row=0,
+        custom_id=f'{short_id_generator()}-upscale-0')
+    async def upscale_button_0(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
         if inuse:
             return
-        await self.handle_riff(interaction, button, 3)
+        await self.handle_upscale(interaction, button, 0)
+
+    @discord.ui.button(label="Upscale 1", style=discord.ButtonStyle.green, row=0,
+        custom_id=f'{short_id_generator()}-upscale-1')
+    async def upscale_button_1(self, interaction: discord.Interaction,
+        button: discord.ui.Button):
+        inuse = await self.global_shows_in_use(interaction)
+        if inuse:
+            return
+        await self.handle_upscale(interaction, button, 1)
 
     @discord.ui.button(label="Retry", style=discord.ButtonStyle.secondary, row=0,
         custom_id=f'{short_id_generator()}-riff-3')
@@ -344,23 +345,23 @@ class FourImageButtons(discord.ui.View):
             return
         await self.handle_retry(interaction, button)
 
-    @discord.ui.button(label="Upscale 0", style=discord.ButtonStyle.green, row=1,
-        custom_id=f'{short_id_generator()}-upscale-0')
-    async def upscale_button_0(self, interaction: discord.Interaction,
+    @discord.ui.button(label="Riff 2", style=discord.ButtonStyle.blurple, row=1,
+        custom_id=f'{short_id_generator()}-riff-2')
+    async def riff_button_2(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
         if inuse:
             return
-        await self.handle_upscale(interaction, button, 0)
+        await self.handle_riff(interaction, button, 2)
 
-    @discord.ui.button(label="Upscale 1", style=discord.ButtonStyle.green, row=1,
-        custom_id=f'{short_id_generator()}-upscale-1')
-    async def upscale_button_1(self, interaction: discord.Interaction,
+    @discord.ui.button(label="Riff 3", style=discord.ButtonStyle.blurple, row=1,
+        custom_id=f'{short_id_generator()}-riff-3')
+    async def riff_button_3(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         inuse = await self.global_shows_in_use(interaction)
         if inuse:
             return
-        await self.handle_upscale(interaction, button, 1)
+        await self.handle_riff(interaction, button, 3)
 
     @discord.ui.button(label="Upscale 2", style=discord.ButtonStyle.green, row=1,
         custom_id=f'{short_id_generator()}-upscale-2')
