@@ -32,7 +32,9 @@ from constants import (
 )
 
 from util import (
+    check_subprompt_token_length,
     document_to_pil,
+    maybe_split_long_prompt_based_on_tokens,
     resize_for_outpainting_modes,
     resize_with_mask,
     short_id_generator,
@@ -61,6 +63,9 @@ with open(FILE_NAME_IN, 'r') as request_json:
         # Prompt
         if request['type'] == 'prompt':
             prompt = request['prompt']
+            prompt = maybe_split_long_prompt_based_on_tokens(prompt)
+            check_subprompt_token_length(prompt)
+
             params = {'num_images': 4}
             if request.get('height', None) is not None:
                 params['height'] = request['height']
@@ -108,6 +113,12 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 prompt_stripped[0:arr_idx] + val + prompt_stripped[arr_idx:]
                 for val in prompt_variations
             ]
+            prompts = [
+                maybe_split_long_prompt_based_on_tokens(val)
+                for val in prompts
+            ]
+            for val in prompts:
+                check_subprompt_token_length(val)
             if len(prompts) > 16:
                 prompts = prompts[0:16]
 
@@ -151,6 +162,8 @@ with open(FILE_NAME_IN, 'r') as request_json:
         # Prompt search
         if request['type'] == 'promptsearch':
             prompt = request['prompt']
+            prompt = maybe_split_long_prompt_based_on_tokens(prompt)
+            check_subprompt_token_length(prompt)
 
             params = {'num_images': 1}
             if request.get('height', None) is not None:
@@ -265,7 +278,9 @@ with open(FILE_NAME_IN, 'r') as request_json:
             if request.get('latentless', False) is not False:
                 params['latentless'] = request['latentless']
             if request.get('prompt', None) is not None:
-                params['prompt'] = request['prompt']
+                prompt = maybe_split_long_prompt_based_on_tokens(request['prompt'])
+                check_subprompt_token_length(prompt)
+                params['prompt'] = prompt
             if request.get('sampler', None) is not None:
                 params['sampler'] = request['sampler']
             if request.get('scale', None) is not None:
@@ -364,6 +379,13 @@ with open(FILE_NAME_IN, 'r') as request_json:
         if request['type'] == 'interpolate':
             params = {'num_images': 9}
             prompt = request['prompt']
+
+            prompts = prompt.split('|')
+            prompts[0] = maybe_split_long_prompt_based_on_tokens(prompts[0].strip())
+            prompts[1] = maybe_split_long_prompt_based_on_tokens(prompts[1].strip())
+            check_subprompt_token_length(prompts[0])
+            check_subprompt_token_length(prompts[1])
+            prompt = '|'.join(prompts)
 
             if request.get('height', None) is not None:
                 params['height'] = request['height']

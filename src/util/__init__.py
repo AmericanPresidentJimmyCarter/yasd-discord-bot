@@ -1,28 +1,20 @@
-import argparse
 import asyncio
 import datetime
 import json
 import math
-import os
-import pathlib
 import random
 import re
 import string
-import sys
-import time
 
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
-from urllib.error import URLError
+from typing import TYPE_CHECKING, Any, Callable
 from urllib.request import urlopen
 
 import discord
 import numpy as np
 
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
-from discord import app_commands
-from docarray import Document, DocumentArray
-from tqdm import tqdm
+from docarray import DocumentArray
 from transformers import CLIPTokenizer
 
 if TYPE_CHECKING:
@@ -137,8 +129,6 @@ async def check_restricted_to_channel(
 
 
 async def check_subprompt_token_length(
-    channel: discord.abc.GuildChannel,
-    user_id: str,
     prompt: str,
 ):
     if prompt is None or prompt == '':
@@ -153,16 +143,13 @@ async def check_subprompt_token_length(
             continue
         as_tokens = tokenizer(subprompt)
         if as_tokens.get('input_ids', None) is None:
-            await channel.send(f'Unable to subprompt parse prompt "{subprompt}"')
-            return False
+            raise ValueError (f'Unable to subprompt parse prompt "{subprompt}"')
         n_tokens = len(as_tokens['input_ids'])
         if n_tokens > MAX_MODEL_CLIP_TOKENS_PER_PROMPT:
-            await channel.send(f'Subprompt "{subprompt}" for user <@{user_id}> ' +
+            raise ValueError(f'Subprompt "{subprompt}" ' +
                 f'is too long (got {n_tokens}, max ' +
                 f'{MAX_MODEL_CLIP_TOKENS_PER_PROMPT}). Shorten this subprompt ' +
                 'or break into multiple weighted subprompts.')
-            return False
-    return True
 
 
 async def check_user_joined_at(
