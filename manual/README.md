@@ -68,6 +68,7 @@ Options:
 - `height`: The height of the output in pixels. Min 384, max 768, steps in 32.
 - `iterations`: The number of times to re-diffuse before generating the final four images. The more iterations, the strong the effect. Default is `1` or no extra iterations. Note that iterations are **ignored** when riffing one aspect ratio to another.
 - `latentless`: Use a random latent to generate the image, meaning that the prior image is not used at all. May be used to test a prompt without the image while using the same parameters.
+- `outpaint_mode`: Whether or not to outpaint (extend) the existing image. Valid options in the `>riff` command are `outpaint_25` (extend 25% in all directions), `outpaint_25_l` (extend 25% left), `outpaint_25_r` (extend 25% right), `outpaint_25_u` (extend 25% down), and `outpaint_25_d` (extend 25% down).
 - `prompt`: Prompt the override the prompt saved in the DocArray.
 - `prompt_mask`: Prompt which specifies what portion of the image you want to diffuse. The rest of the image will be untouched.
 - `resize`: If `True`, the image will be scaled instead of outpainted when changing the dimensions.
@@ -86,6 +87,7 @@ This generates a series of 9 images that start with one prompt and end with anot
 - `height`: The height of the output in pixels. Min 384, max 768, steps in 32.
 - `prompt 1`: Prompt to start the interpolation from.
 - `prompt 2`: Prompt to interpolate to.
+- `resample_prior`: Whether or not to re-use the previous image when making the next image. Default `True`.
 - `sampler`: Which sampler to use when creating the image. Some samplers, such as `euler`, may require fewer steps to get good results, while others can have [a dramatic effect](https://i.redd.it/uy2fp799wmj91.jpg) on image generation itself. Defaults to `k_lms`.
 - `scale`: Conditioning scale for prompt (1.0 to 50.0). This is how strongly the prompt conditions the image. Very high scales may induce a saturation like effect.  Default 7.5.
 - `seed`: Deterministic seed integer used to generate your images. The seed defines the noise that will be used to generate your image, and will cause reproducible results when reusing seeds. Default random integer.

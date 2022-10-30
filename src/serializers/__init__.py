@@ -83,6 +83,7 @@ def serialize_riff_request(
     height: Optional[int]=None,
     iterations: Optional[int]=None,
     latentless: bool=False,
+    outpaint_mode: Optional[str]=None,
     prompt: Optional[str]=None,
     prompt_mask: Optional[str]=None,
     resize: bool=False,
@@ -103,6 +104,8 @@ def serialize_riff_request(
         options += f'{iterations=},'
     if latentless is True:
         options += f'{latentless=},'
+    if outpaint_mode is not None:
+        options += f'{outpaint_mode=},'
     if prompt is not None:
         prompt = prompt_un_parenthesis_un_comma(prompt, uncomma=True)
         options += f'{prompt=},'

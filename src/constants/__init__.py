@@ -101,6 +101,20 @@ HEIGHT_AND_WIDTH_CHOICES = [
 ]
 
 
+OUTPAINT_CHOICES = [
+    app_commands.Choice(name="25% all sides",
+        value=OutpaintingModes.OUTPAINT_25_ALL),
+    app_commands.Choice(name="Left 25%",
+        value=OutpaintingModes.OUTPAINT_25_LEFT),
+    app_commands.Choice(name="Right 25%",
+        value=OutpaintingModes.OUTPAINT_25_RIGHT),
+    app_commands.Choice(name="Up 25%",
+        value=OutpaintingModes.OUTPAINT_25_UP),
+    app_commands.Choice(name="Down 25%",
+        value=OutpaintingModes.OUTPAINT_25_DOWN),
+]
+
+
 SAMPLER_CHOICES = [
     app_commands.Choice(name="k_lms", value="k_lms"),
     app_commands.Choice(name="dpm2", value="dpm2"),

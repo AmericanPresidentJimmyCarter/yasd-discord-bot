@@ -286,6 +286,7 @@ async def riff(
             height=height,
             iterations=iterations,
             latentless=bool(latentless),
+            outpaint_mode=outpaint_mode,
             prompt=prompt,
             prompt_mask=prompt_mask,
             resize=bool(resize),

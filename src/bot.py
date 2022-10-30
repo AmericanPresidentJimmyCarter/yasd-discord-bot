@@ -34,6 +34,7 @@ from constants import (
     MIN_STEPS,
     MIN_STRENGTH,
     NUM_IMAGES_MAX,
+    OUTPAINT_CHOICES,
     SAMPLER_CHOICES,
     TEMP_JSON_STORAGE_FOLDER,
     UPSCALER_CHOICES,
@@ -260,6 +261,7 @@ async def image(
     idx='The index of the bot generated image you want to riff',
     iterations='Number of diffusion iterations (1 to 16, default=1)',
     latentless='Do not compute latent embeddings from original image (default=False)',
+    outpaint='Extend the image in various directions',
     prompt='Prompt, which overrides the original prompt for the image (default=None)',
     prompt_mask='Prompt to generate a mask to inpaint one, add "not " prefix to invert (default=None)',
     resize='Resize the image when adjusting width/height instead of attempting outpaint (default=False)',
@@ -271,6 +273,7 @@ async def image(
 )
 @app_commands.choices(
     height=HEIGHT_AND_WIDTH_CHOICES,
+    outpaint=OUTPAINT_CHOICES,
     sampler=SAMPLER_CHOICES,
     width=HEIGHT_AND_WIDTH_CHOICES,
 )
@@ -283,6 +286,7 @@ async def riff(
     height: Optional[app_commands.Choice[int]] = None,
     iterations: Optional[app_commands.Range[int, MIN_ITERATIONS, MAX_ITERATIONS]] = None,
     latentless: Optional[bool]=False,
+    outpaint: Optional[app_commands.Choice[str]] = None,
     prompt: Optional[str]=None,
     prompt_mask: Optional[str]=None,
     resize: Optional[bool]=False,
@@ -305,6 +309,7 @@ async def riff(
         height=height.value if height is not None else None,
         iterations=iterations,
         latentless=bool(latentless),
+        outpaint_mode=outpaint.value if outpaint is not None else None,
         prompt=prompt,
         prompt_mask=prompt_mask,
         resize=bool(resize),
@@ -608,6 +613,7 @@ async def on_message(message):
         height = None
         iterations = None
         latentless = False
+        outpaint_mode = None
         prompt = None
         prompt_mask = None
         resize = False
@@ -632,6 +638,8 @@ async def on_message(message):
                         height = height_int
                 except Exception:
                     pass
+            if 'outpaint_mode' in opts:
+                outpaint_mode = opts['outpaint_mode']
             if 'prompt' in opts:
                 prompt = opts['prompt']
             if 'prompt_mask' in opts:
@@ -690,6 +698,7 @@ async def on_message(message):
             height=height,
             iterations=iterations,
             latentless=bool(latentless),
+            outpaint_mode=outpaint_mode,
             prompt=prompt,
             prompt_mask=prompt_mask,
             resize=resize,
@@ -742,6 +751,7 @@ async def on_message(message):
 
         iterations = None
         latentless = False
+        outpaint_mode = None
         prompt_mask = None
         resize = False
         sampler = None
@@ -770,10 +780,12 @@ async def on_message(message):
                         pass
                 if 'latentless' in opts:
                     latentless = True
-                if 'resize' in opts:
-                    resize = True
+                if 'outpaint_mode' in opts:
+                    outpaint_mode = opts['outpaint_mode']
                 if 'prompt_mask' in opts:
                     prompt_mask = opts['prompt_mask']
+                if 'resize' in opts:
+                    resize = True
                 if 'sampler' in opts:
                     sampler = opts['sampler']
                 if 'scale' in opts:
@@ -809,9 +821,10 @@ async def on_message(message):
         await actions.riff(message.channel, message.author, client, sid, 0,
             iterations=iterations,
             latentless=latentless,
+            outpaint_mode=outpaint_mode,
             prompt=prompt,
-            resize=resize,
             prompt_mask=prompt_mask,
+            resize=resize,
             sampler=sampler,
             scale=scale,
             seed=seed,
