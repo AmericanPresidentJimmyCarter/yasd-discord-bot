@@ -198,6 +198,7 @@ client = YASDClient(
     button_store_path=bs_path,
     cli_args=args,
     currently_fetching_ai_image=currently_fetching_ai_image,
+    guild_id=guild,
     intents=intents,
     prompt_check_fn=prompt_check_fn,
     safety_checker=safety_checker,
