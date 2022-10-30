@@ -89,6 +89,9 @@ parser.add_argument('--nsfw-wordlist',
     help='Newline separated wordlist filename',
     type=str,
     required=False)
+parser.add_argument('--reload-last-minutes', dest='reload_last_minutes',
+    help='When reloading the bot, how far back in minutes to load old ' +
+    'UI elements (default 120 minutes)', type=int, required=False)
 parser.add_argument('--restrict-all-to-channel',
     dest='restrict_all_to_channel',
     help='Restrict all commands to a specific channel',
@@ -1019,11 +1022,16 @@ async def on_message(message):
 async def on_ready():
     print('Loading old buttons back into memory')
     now = int(time.time())
-    forty_eight_hours_ago = now - 2 * 24 * 60 * 60
+
+    # Default is two hours to look back ewhen loading.
+    reload_last_seconds = 120 * 60
+    if args.reload_last_minutes is not None:
+        reload_last_seconds = args.reload_last_minutes * 60
+
     # init the button handler and load up any previously saved buttons. Skip
-    # any buttons that are more than 48 hours old.
+    # any buttons that are more than reload_last_seconds old.
     for view_dict in tqdm(button_store_dict[BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY]):
-        if view_dict['time'] >= forty_eight_hours_ago:
+        if view_dict['time'] >= now - reload_last_seconds:
             try:
                 view = FourImageButtons.from_serialized(client, view_dict)
             except KeyError:

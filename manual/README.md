@@ -115,7 +115,9 @@ Upscale buttons using the feature are automatically added to all `riff` or `imag
 
 ### Bot arguments
 
-- `--allow-queue`: If this is true, the users are allowed to make any quantity of images for themselves at the same time. By default, users are restricted to one image at a time.
+- `--allow-queue`: If this is true, the users are allowed to make any quantity of images for themselves at the same time. By default, users are restricted to one image at a time with this flag off. The number of simultaneous requests can be restricted with `--max-queue`.
+
+- `--default-sampler <sampler>`: The default sampler to use (`k_lms`, `dpm2`, `dpm2_ancestral`, `euler`, `euler_ancestral`, or `heun`).
 
 - `--default-steps <steps>`: The default number of steps to use on `/image` or `>image`.
 
@@ -130,6 +132,8 @@ Upscale buttons using the feature are automatically added to all `riff` or `imag
 - `--nsfw-prompt-detection`: Use BERT through detoxify to detect potentially offensive or NSFW prompts.
 
 - `--nsfw-wordlist <wordlist>`:  Reject any prompts if they contain a word within a wordlist. The wordlist should be strings separated by newlines. Any strings prefixed with `r/` and suffixed with `/` will be tested as regular expressions instead.
+
+- `--reload-last-minutes <integer>`: The number of minutes to look back when reloading UI elements on restart. Lower may be better for very busy servers, as if the old UI loading step takes too long Discord may drop the bot and you will enter an infinite reconnection loop.
 
 - `--restrict-all-to-channel <channel_id>`: Discord channel ID to restrict all your commands to.
 
