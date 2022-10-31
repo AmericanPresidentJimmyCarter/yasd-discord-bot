@@ -245,8 +245,10 @@ class FourImageButtons(discord.ui.View):
         if self.strength is not None:
             strength = self.strength
 
+        prompt = None
         if self.prompt_input_element.value: # type: ignore
             prompt = self.prompt_input_element.value # type: ignore
+        prompt_mask = None
         if self.prompt_mask_input_element.value: # type: ignore
             prompt_mask = self.prompt_mask_input_element.value # type: ignore
 
