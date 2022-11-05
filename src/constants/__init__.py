@@ -123,9 +123,14 @@ SAMPLER_CHOICES = [
     app_commands.Choice(name="heun", value="heun"),
     app_commands.Choice(name="euler", value="euler"),
     app_commands.Choice(name="euler_ancestral", value="euler_ancestral"),
+    app_commands.Choice(name="dpm_fast", value="dpm_fast"),
+    app_commands.Choice(name="dpm_adaptive", value="dpm_adaptive"),
+    app_commands.Choice(name="dpmpp_2s_ancestral", value="dpmpp_2s_ancestral"),
+    app_commands.Choice(name="dpmpp_2m", value="dpmpp_2m"),
 ]
 VALID_SAMPLERS = ['k_lms', 'dpm2', 'dpm2_ancestral', 'heun', 'euler',
-    'euler_ancestral']
+    'euler_ancestral', 'dpm_fast', 'dpm_adaptive', 'dpmpp_2s_ancestral',
+    'dpmpp_2m']
 
 
 UPSCALER_CHOICES = [
