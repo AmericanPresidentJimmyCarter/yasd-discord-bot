@@ -256,6 +256,10 @@ OPTIONAL: If you aren't running jina on the same box, you will need change the a
 - Generate images from images (and optionally prompts) (`>image2image foo bar`)
 - Diffuse ("riff") on images it has previously generated (`/riff <id> <idx>`)
 - Interpolate between two prompts (`/interpolate <prompt 1> <prompt 2>`)
+- Use any k-diffusion sampler to generate images
+- Outpaint images directionally or in all directions at once
+- Inpaint images with a mask selected automatically from text
+- Queue generations per user and restrict the user queue to n-many generations at time
 
 Examples:
 
