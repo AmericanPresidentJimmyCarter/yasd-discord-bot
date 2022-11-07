@@ -104,6 +104,8 @@ Then run the container with this command:
 sudo docker run -e DISABLE_CLIP="1" \
   -e DISABLE_DALLE_MEGA="1" \
   -e DISABLE_GLID3XL="1" \
+  -e ENABLE_CLIPSEG="1" \
+  -e ENABLE_REALESRGAN="1" \
   -e ENABLE_STABLE_DIFFUSION="1" \
   -p 51005:51005 \
   -it \
@@ -172,6 +174,8 @@ Then run the container with this command:
 sudo docker run -e DISABLE_CLIP="1" \
   -e DISABLE_DALLE_MEGA="1" \
   -e DISABLE_GLID3XL="1" \
+  -e ENABLE_CLIPSEG="1" \
+  -e ENABLE_REALESRGAN="1" \
   -e ENABLE_STABLE_DIFFUSION="1" \
   -p 51005:51005 \
   -it \
