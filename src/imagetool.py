@@ -222,6 +222,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
             orig_height = None
             orig_image = None
             orig_prompt = None
+            resize = request.get('resize', False)
 
             if not request.get('from_discord', False):
                 docarray_id = request['docarray_id']
@@ -250,7 +251,13 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 _d.text = prompt
                 da = DocumentArray([_d])
 
-            if request.get('resize', False) is True and \
+            # We are never outpainting if we are shrinking the image.
+            if request.get('height', None) is not None and \
+                request.get('width', None) is not None:
+                resize = resize or (request['height'] < orig_height and
+                    request['width'] < orig_width)
+
+            if resize is True and \
                 request.get('height', None) is not None and \
                 request.get('width', None) is not None:
                 resized_image = orig_image.resize((
@@ -308,7 +315,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
 
             # Outpainting either through arbitrary resizing or by outpainting
             # modes.
-            if not request.get('resize', False) and (
+            if not resize and (
                     params['height'] != orig_height or
                     params['width'] != orig_width
                 ):
@@ -326,7 +333,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 da = DocumentArray([_d])
                 diffused_da = da.post(f'{JINA_SERVER_URL}/stablediffuse',
                     parameters=params_copy)[0].matches
-            elif not request.get('resize', False) and \
+            elif not resize and \
                 request.get('outpaint_mode', None) is not None:
                 # Outpainting modes.
                 img_new = resize_for_outpainting_modes(orig_image,
