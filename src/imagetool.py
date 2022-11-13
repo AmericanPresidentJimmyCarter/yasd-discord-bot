@@ -451,8 +451,8 @@ with open(FILE_NAME_IN, 'r') as request_json:
 
             canvas_scale = 4
             max_image_size = request.get('max_image_size', 768)
-            if max(image.size[0] * canvas_scale, image.size[1] * canvas_scale) > \
-                max_image_size * canvas_scale:
+            if image.size[0] * image.size[1] * canvas_scale > \
+                ((max_image_size * canvas_scale) ** 2):
                 raise ValueError('This image is already the maximum size of ' +
                     f'{max_image_size * canvas_scale} for either height or ' +
                     'width')

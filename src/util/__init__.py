@@ -370,7 +370,7 @@ def resize_image(img: Image, max_size: int) -> Image:
     if h == MIN_IMAGE_HEIGHT_WIDTH:
         w = min(max_size, int(w_orig * (h / h_orig)))
 
-    w, h = map(lambda x: x - x % 16, (w, h))  # resize to integer multiple of 16
+    w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
 
     # If the image is RGBA and the mask layer is empty, remove it.
     if img.mode == 'RGBA' and img.split()[-1].getextrema() == (255, 255):
