@@ -437,7 +437,8 @@ def resize_for_outpainting_modes(
         together = Image.composite(image_expanded, noised, mask)
         together.putalpha(mask)
         image_expanded_and_masked = together
-        intended_expansion_size_max = max(int(w * 1.25), int(h * 1.25))
+        intended_expansion_size_max = max(int(math.floor(w) * 1.25),
+            int(math.floor(h) * 1.25))
 
     if mode in [
         OutpaintingModes.OUTPAINT_25_LEFT,
@@ -469,7 +470,7 @@ def resize_for_outpainting_modes(
                 canvas_width - 1,
                 canvas_height - 1,
             )
-            intended_expansion_size_max = int(w * 1.25)
+            intended_expansion_size_max = int(math.floor(w) * 1.25)
         if mode == OutpaintingModes.OUTPAINT_25_RIGHT:
             coords_paste = (
                 0,
@@ -483,7 +484,7 @@ def resize_for_outpainting_modes(
                 w - 1,
                 canvas_height - 1,
             )
-            intended_expansion_size_max = int(w * 1.25)
+            intended_expansion_size_max = int(math.floor(w) * 1.25)
         if mode == OutpaintingModes.OUTPAINT_25_UP:
             coords_paste = (
                 0,
@@ -497,7 +498,7 @@ def resize_for_outpainting_modes(
                 canvas_width - 1,
                 canvas_height - 1,
             )
-            intended_expansion_size_max = int(h * 1.25)
+            intended_expansion_size_max = int(math.floor(h) * 1.25)
         if mode == OutpaintingModes.OUTPAINT_25_DOWN:
             coords_paste = (
                 0,
@@ -511,7 +512,7 @@ def resize_for_outpainting_modes(
                 canvas_width - 1,
                 h - 1,
             )
-            intended_expansion_size_max = int(h * 1.25)
+            intended_expansion_size_max = int(math.floor(h) * 1.25)
 
         # Limit outpainting expansion based on the user-declared maximum size.
         if intended_expansion_size_max > max_size:

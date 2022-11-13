@@ -20,7 +20,6 @@ from constants import (
     DOCARRAY_LOCATION_FN,
     IMAGE_LOCATION_FN,
     IMAGE_LOCATION_FN_JPG,
-    IMAGE_STORAGE_FOLDER,
     OutpaintingModes,
     RealESRGANModels,
     TEMP_JSON_STORAGE_FOLDER,

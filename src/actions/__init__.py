@@ -2,6 +2,8 @@ from typing import TYPE_CHECKING, Optional
 
 import discord
 
+from PIL import Image
+
 from constants import (
     DISCORD_EMBED_MAX_LENGTH,
     REGEX_FOR_ID,
@@ -296,10 +298,14 @@ async def riff(
             attachments=[file],
             view=btns)
 
+        final_width, final_height = Image.open(image_loc).size
+        final_width = final_width // 2
+        final_height = final_height // 2
+
         serialized_cmd = serialize_riff_request(
             docarray_id=docarray_id,
             idx=idx,
-            height=height,
+            height=final_height,
             iterations=iterations,
             latentless=bool(latentless),
             outpaint_mode=outpaint_mode,
@@ -311,7 +317,7 @@ async def riff(
             seed=seed_from_docarray_id(short_id),
             steps=steps,
             strength=strength,
-            width=width)
+            width=final_width)
         await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
     except Exception as e:
         import traceback
