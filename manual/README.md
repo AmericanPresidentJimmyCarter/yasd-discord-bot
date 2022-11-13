@@ -106,7 +106,7 @@ Simply tagging the bot with a message starting with `@bot_name` where `bot_name`
 
 Upscale an image to 4x the resolution (512x512 -> 2048x2048).
 
-The upscaler itself is selectable using the `upscaler` option. Valid values are SwinIR('swinir'), RealESRGAN 4x('resrgan_4x'), RealESRGAN 4x + Face Fix ('resrgan_4x_face'), RealESRGAN 4x Anime, and no upscale (just return the image, 'no_upscale').
+The upscaler itself is selectable using the `upscaler` option. Valid values are SwinIR('swinir'), RealESRGAN 4x('resrgan_4x'), RealESRGAN 4x + Face Fix ('resrgan_4x_face'), RealESRGAN 4x Anime, Stable Diffusion based upscalers, and no upscale (just return the image, 'no_upscale').
 
 Upscale buttons using the feature are automatically added to all `riff` or `image` commands.
 
@@ -124,6 +124,8 @@ Upscale buttons using the feature are automatically added to all `riff` or `imag
 - `-g <guild_id>` or `--guild <guild_id>`: Discord guild/server ID to send your slash commands to. If not specified, it may take up to an hour for your slash commands to show up.
 
 - `--hours-on-server-to-use <hours>`: The number of hours a user must have been on the server to use the bot.
+
+- `--max-image-size <pixels>`: The maximum image size in pixels. The default is 768. Adjust this based on the amount of memory you have for your video cards.
 
 - `--max-queue <integer>`: The maximum number of concurrent requests allowed when the `--allow-queue` option is turned on (default is 9999).
 

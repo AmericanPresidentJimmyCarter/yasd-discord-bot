@@ -1,3 +1,4 @@
+import math
 import random
 import time
 
@@ -11,13 +12,20 @@ import actions
 
 from constants import (
     BUTTON_STORE_FOUR_IMAGES_BUTTONS_KEY,
+    DEFAULT_IMAGE_HEIGHT_WIDTH,
     DOCARRAY_LOCATION_FN,
+    MAX_UPSCALE_SIZE,
     OutpaintingModes,
-    UPSCALER_SWINIR,
-    UPSCALER_REALESRGAN_4X,
-    UPSCALER_REALESRGAN_4X_FACE,
-    UPSCALER_REALESRGAN_4X_ANIME,
     UPSCALER_NONE,
+    UPSCALER_REALESRGAN_4X,
+    UPSCALER_REALESRGAN_4X_ANIME,
+    UPSCALER_REALESRGAN_4X_FACE,
+    UPSCALER_STABLE_1,
+    UPSCALER_STABLE_2,
+    UPSCALER_STABLE_3,
+    UPSCALER_STABLE_4,
+    UPSCALER_STABLE_5,
+    UPSCALER_SWINIR,
 )
 
 
@@ -41,8 +49,8 @@ class FourImageButtons(discord.ui.View):
     idx_parent: int|None = None
     message_id: int|None = None
     outpaint_mode: str|None = None
-    pixels_height: int|None = 512
-    pixels_width: int|None = 512
+    pixels_height: int|None = DEFAULT_IMAGE_HEIGHT_WIDTH
+    pixels_width: int|None = DEFAULT_IMAGE_HEIGHT_WIDTH
     prompt_input_element: 'discord.ui.TextInput|None' = None
     prompt_input_element_custom_id: str|None = None
     prompt_mask_input_element: 'discord.ui.TextInput|None' = None
@@ -339,12 +347,18 @@ class FourImageButtons(discord.ui.View):
         idx: int,
     ):
         await interaction.response.defer()
+
+        prompt = None
+        if self.prompt_input_element.value: # type: ignore
+            prompt = self.prompt_input_element.value # type: ignore
+
         await actions.upscale(
             interaction.channel,
             interaction.user,
             self.context, # type: ignore
             self.short_id, # type: ignore
             idx,
+            prompt=prompt,
             upscaler=self.upscaler)
 
     @discord.ui.button(label="Riff 0", style=discord.ButtonStyle.blurple, row=0,
@@ -452,27 +466,28 @@ class FourImageButtons(discord.ui.View):
         self.outpaint_mode = None
         selected = selection.values
         sel = selected[0]
+        max_size = MAX_UPSCALE_SIZE
         if sel == '2:1':
-            self.pixels_height = 384
-            self.pixels_width = 768
+            self.pixels_height = int(max_size / 2)
+            self.pixels_width = max_size
         if sel == '3:2': # ish
-            self.pixels_height = 448
-            self.pixels_width = 704
+            self.pixels_height = 16 * math.ceil(max_size * (2/3) * (1/16))
+            self.pixels_width = max_size
         if sel == '4:3':
-            self.pixels_height = 480
-            self.pixels_width = 640
+            self.pixels_height = 16 * math.ceil(max_size * (3/4) * (1/16))
+            self.pixels_width = max_size
         if sel == '1:1':
-            self.pixels_height = 512
-            self.pixels_width = 512
+            self.pixels_height = max_size
+            self.pixels_width = max_size
         if sel == '3:4':
-            self.pixels_height = 640
-            self.pixels_width = 480
+            self.pixels_height = max_size
+            self.pixels_width = 16 * math.ceil(max_size * (3/4) * (1/16))
         if sel == '2:3': # ish
-            self.pixels_height = 704
-            self.pixels_width = 448
+            self.pixels_height = max_size
+            self.pixels_width = 16 * math.ceil(max_size * (2/3) * (1/16))
         if sel == '1:2':
-            self.pixels_height = 768
-            self.pixels_width = 384
+            self.pixels_height = max_size
+            self.pixels_width = int(max_size / 2)
         if sel in [
             OutpaintingModes.OUTPAINT_25_ALL,
             OutpaintingModes.OUTPAINT_25_LEFT,
@@ -523,6 +538,16 @@ class FourImageButtons(discord.ui.View):
                 value=UPSCALER_REALESRGAN_4X_FACE),
             discord.SelectOption(label='RealESRGAN Anime (line art and anime)',
                 value=UPSCALER_REALESRGAN_4X_ANIME),
+            discord.SelectOption(label='Diffusion Upscale (0.1 strength)',
+                value=UPSCALER_STABLE_1),
+            discord.SelectOption(label='Diffusion Upscale (0.2 strength)',
+                value=UPSCALER_STABLE_2),
+            discord.SelectOption(label='Diffusion Upscale (0.3 strength)',
+                value=UPSCALER_STABLE_3),
+            discord.SelectOption(label='Diffusion Upscale (0.4 strength)',
+                value=UPSCALER_STABLE_4),
+            discord.SelectOption(label='Diffusion Upscale (0.5 strength)',
+                value=UPSCALER_STABLE_5),
             discord.SelectOption(label='No Upscale (gives options to edit image)',
                 value=UPSCALER_NONE),
         ])

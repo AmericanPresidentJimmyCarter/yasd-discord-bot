@@ -23,7 +23,6 @@ from constants import (
     BUTTON_STORE_ONE_IMAGE_BUTTONS_KEY,
     DOCARRAY_LOCATION_FN,
     DOCARRAY_STORAGE_FOLDER,
-    HEIGHT_AND_WIDTH_CHOICES,
     IMAGE_LOCATION_FN,
     IMAGE_STORAGE_FOLDER,
     MANUAL_LINK,
@@ -32,6 +31,8 @@ from constants import (
     MAX_SEED,
     MAX_STEPS,
     MAX_STRENGTH,
+    MAX_UPSCALE_SIZE,
+    MIN_IMAGE_HEIGHT_WIDTH,
     MIN_ITERATIONS,
     MIN_SCALE,
     MIN_STEPS,
@@ -45,14 +46,19 @@ from constants import (
     UPSCALER_REALESRGAN_4X,
     UPSCALER_REALESRGAN_4X_ANIME,
     UPSCALER_REALESRGAN_4X_FACE,
+    UPSCALER_STABLE_1,
+    UPSCALER_STABLE_2,
+    UPSCALER_STABLE_3,
+    UPSCALER_STABLE_4,
+    UPSCALER_STABLE_5,
     UPSCALER_SWINIR,
-    VALID_IMAGE_HEIGHT_WIDTH,
     VALID_SAMPLERS,
 )
 from ui import (
     FourImageButtons,
     OneImageButtons,
 )
+from ui.choices import generate_height_and_width_choices
 from util import (
     prompt_contains_nsfw,
     prompt_has_valid_sd_custom_embeddings,
@@ -66,15 +72,22 @@ parser.add_argument('token', help='Discord token')
 parser.add_argument('--allow-queue', dest='allow_queue',
     action=argparse.BooleanOptionalAction)
 parser.add_argument('--default-sampler', dest='default_sampler', nargs='?',
-    type=str, help='Default sampler to use', default=None)
+    type=str, help='Default sampler to use', default='dpmpp_2m')
 parser.add_argument('--default-steps', dest='default_steps', nargs='?',
-    type=int, help='Default number of steps for the sampler', default=50)
+    type=int, help='Default number of steps for the sampler', default=35)
 parser.add_argument('--hours-on-server-to-use', dest='hours_needed', nargs='?',
     type=int,
     help='The hours the user has been on the server before they can use the bot',
     required=False)
 parser.add_argument('-g', '--guild', dest='guild',
     help='Discord guild ID', type=int, required=False)
+parser.add_argument('--max-image-size',
+    dest='max_image_size',
+    type=int,
+    help='The maximum height or width of images in pixels',
+    required=False,
+    default=MAX_UPSCALE_SIZE,
+)
 parser.add_argument('--max-queue',
     dest='max_queue',
     type=int,
@@ -105,6 +118,10 @@ parser.add_argument('--restrict-slash-to-channel',
     type=int, required=False)
 args = parser.parse_args()
 
+if args.max_image_size % 16 != 0:
+    print(f'The maximum image size is not valid (got {args.max_image_size}, ' +
+        'which is not a multiple of 16')
+    sys.exit(1)
 
 # Load up diffusers NSFW detection model and the NSFW wordlist detector.
 nsfw_toxic_detection_fn: Callable|None = None
@@ -174,6 +191,11 @@ button_store_dict: dict[str, list] = {
 
 
 BUTTON_STORE = f'{TEMP_JSON_STORAGE_FOLDER}/button-store-{str(guild)}.json'
+HEIGHT_AND_WIDTH_CHOICES = generate_height_and_width_choices(
+    args.max_image_size)
+VALID_IMAGE_HEIGHT_WIDTH = set(map(
+    lambda x: MIN_IMAGE_HEIGHT_WIDTH + (16 * x),
+    range(int((args.max_image_size - MIN_IMAGE_HEIGHT_WIDTH)/16) + 1)))
 
 
 pathlib.Path(DOCARRAY_STORAGE_FOLDER).mkdir(parents=True, exist_ok=True)
@@ -407,7 +429,10 @@ async def image2image(
 
     image_fn = IMAGE_LOCATION_FN(short_id)
     da_fn = DOCARRAY_LOCATION_FN(short_id)
-    image = resize_image(image)
+
+    image = resize_image(image, min(
+        max(*image.size, MAX_UPSCALE_SIZE),
+        args.max_image_size))
     image.save(image_fn, format='PNG')
 
     buffered = BytesIO()
@@ -751,7 +776,9 @@ async def on_message(message):
                     f'Could not load image file for attachment {message.attachments[0].filename}')
                 return
 
-            image = resize_image(image)
+            image = resize_image(image, min(
+                max(*image.size, MAX_UPSCALE_SIZE),
+                args.max_image_size))
             image.save(image_fn, format='PNG')
 
             buffered = BytesIO()
@@ -976,6 +1003,11 @@ async def on_message(message):
                         UPSCALER_REALESRGAN_4X_ANIME,
                         UPSCALER_REALESRGAN_4X_FACE,
                         UPSCALER_SWINIR,
+                        UPSCALER_STABLE_1,
+                        UPSCALER_STABLE_2,
+                        UPSCALER_STABLE_3,
+                        UPSCALER_STABLE_4,
+                        UPSCALER_STABLE_5,
                     ]:
                         upscaler = opts['upscaler']
 
@@ -997,7 +1029,9 @@ async def on_message(message):
                 await message.channel.send(f'Could not load image file for attachment {i}')
                 continue
 
-            image = resize_image(image)
+            image = resize_image(image, min(
+                max(*image.size, MAX_UPSCALE_SIZE),
+                args.max_image_size))
             image.save(image_fn, format='PNG')
 
             buffered = BytesIO()
@@ -1016,7 +1050,7 @@ async def on_message(message):
             clean_content_split = message.clean_content.split(' ')
             if len(clean_content_split) > 1:
                 clean_content = ' '.join(clean_content_split)
-            _d.text = ''
+            _d.text = clean_content
 
             da = DocumentArray([_d])
             da.save_binary(da_fn, protocol='protobuf', compress='lz4')
@@ -1024,7 +1058,7 @@ async def on_message(message):
             msg = await message.channel.send(f'Attachment {attachment.filename} ({i}) sent by ' +
                 f'<@{str(message.author.id)}> has been uploaded and given ID `{sid}`.')
             view = OneImageButtons(context=client, message_id=msg.id,
-                short_id_parent=sid, idx_parent=0, prompt='')
+                short_id_parent=sid, idx_parent=0, prompt=_d.text)
             view.serialize_to_json_and_store(button_store_dict) # type: ignore
             client.add_view(view, message_id=msg.id)
             await msg.edit(view=view)

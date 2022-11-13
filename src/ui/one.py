@@ -1,3 +1,4 @@
+import math
 import random
 import time
 
@@ -11,8 +12,20 @@ import actions
 
 from constants import (
     BUTTON_STORE_ONE_IMAGE_BUTTONS_KEY,
+    DEFAULT_IMAGE_HEIGHT_WIDTH,
     DOCARRAY_LOCATION_FN,
+    MAX_UPSCALE_SIZE,
     OutpaintingModes,
+    UPSCALER_NONE,
+    UPSCALER_REALESRGAN_4X,
+    UPSCALER_REALESRGAN_4X_ANIME,
+    UPSCALER_REALESRGAN_4X_FACE,
+    UPSCALER_STABLE_1,
+    UPSCALER_STABLE_2,
+    UPSCALER_STABLE_3,
+    UPSCALER_STABLE_4,
+    UPSCALER_STABLE_5,
+    UPSCALER_SWINIR,
 )
 from util import (
     document_to_pil,
@@ -27,13 +40,14 @@ if TYPE_CHECKING:
 class OneImageButtons(discord.ui.View):
     RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE = 'Select Riff Outpainting'
     RIFF_STRENGTH_PLACEHOLDER_MESSAGE = 'Select Riff Strength (no effect on paint)'
+    UPSCALER_PLACEHOLDER_MESSAGE = 'Select Upscaler'
 
     context: 'YASDClient|None' = None
     idx_parent: int|None = None
     message_id: int|None = None
     outpaint_mode: str|None = None
-    pixels_height: int|None = 512
-    pixels_width: int|None = 512
+    pixels_height: int|None = DEFAULT_IMAGE_HEIGHT_WIDTH
+    pixels_width: int|None = DEFAULT_IMAGE_HEIGHT_WIDTH
     prompt_input_element: 'discord.ui.TextInput|None' = None
     prompt_input_element_custom_id: str|None = None
     prompt_mask_input_element: 'discord.ui.TextInput|None' = None
@@ -178,7 +192,8 @@ class OneImageButtons(discord.ui.View):
             for item in fib.children }
         for item_dict in serialized['items']:
             if item_dict['label'] == fib.RIFF_ASPECT_RATIO_PLACEHOLDER_MESSAGE or \
-                item_dict['label'] == fib.RIFF_STRENGTH_PLACEHOLDER_MESSAGE:
+                item_dict['label'] == fib.RIFF_STRENGTH_PLACEHOLDER_MESSAGE or \
+                item_dict['label'] == fib.UPSCALER_PLACEHOLDER_MESSAGE:
                 sel = mapped_to_label[item_dict['label']]
                 sel.custom_id = item_dict['custom_id']
             else:
@@ -255,11 +270,35 @@ class OneImageButtons(discord.ui.View):
             strength=strength,
             width=self.pixels_width)
 
+    async def handle_upscale(self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        await interaction.response.defer()
+
+        prompt = None
+        if self.prompt_input_element.value: # type: ignore
+            prompt = self.prompt_input_element.value # type: ignore
+        await actions.upscale(
+            interaction.channel,
+            interaction.user,
+            self.context, # type: ignore
+            self.short_id_parent, # type: ignore
+            0,
+            prompt=prompt,
+            upscaler=self.upscaler)
+
     @discord.ui.button(label="Riff", style=discord.ButtonStyle.blurple, row=0,
         custom_id=f'{short_id_generator()}-riff')
     async def riff_button(self, interaction: discord.Interaction,
         button: discord.ui.Button):
         await self.handle_riff(interaction, button)
+
+    @discord.ui.button(label="Upscale", style=discord.ButtonStyle.green, row=0,
+        custom_id=f'{short_id_generator()}-upscale')
+    async def upscale_button(self, interaction: discord.Interaction,
+        button: discord.ui.Button):
+        await self.handle_upscale(interaction, button)
 
     @discord.ui.button(label="Prompt Editor", style=discord.ButtonStyle.secondary,
         row=0,
@@ -312,27 +351,28 @@ class OneImageButtons(discord.ui.View):
         self.outpaint_mode = None
         selected = selection.values
         sel = selected[0]
+        max_size = MAX_UPSCALE_SIZE
         if sel == '2:1':
-            self.pixels_height = 384
-            self.pixels_width = 768
+            self.pixels_height = int(max_size / 2)
+            self.pixels_width = max_size
         if sel == '3:2': # ish
-            self.pixels_height = 448
-            self.pixels_width = 704
+            self.pixels_height = 16 * math.ceil(max_size * (2/3) * (1/16))
+            self.pixels_width = max_size
         if sel == '4:3':
-            self.pixels_height = 480
-            self.pixels_width = 640
+            self.pixels_height = 16 * math.ceil(max_size * (3/4) * (1/16))
+            self.pixels_width = max_size
         if sel == '1:1':
-            self.pixels_height = 512
-            self.pixels_width = 512
+            self.pixels_height = max_size
+            self.pixels_width = max_size
         if sel == '3:4':
-            self.pixels_height = 640
-            self.pixels_width = 480
+            self.pixels_height = max_size
+            self.pixels_width = 16 * math.ceil(max_size * (3/4) * (1/16))
         if sel == '2:3': # ish
-            self.pixels_height = 704
-            self.pixels_width = 448
+            self.pixels_height = max_size
+            self.pixels_width = 16 * math.ceil(max_size * (2/3) * (1/16))
         if sel == '1:2':
-            self.pixels_height = 768
-            self.pixels_width = 384
+            self.pixels_height = max_size
+            self.pixels_width = int(max_size / 2)
         if sel in [
             OutpaintingModes.OUTPAINT_25_ALL,
             OutpaintingModes.OUTPAINT_25_LEFT,
@@ -369,5 +409,39 @@ class OneImageButtons(discord.ui.View):
             self.strength = None
         else:
             self.strength = float(selected[0])
+
+        await interaction.response.defer()
+
+    @discord.ui.select(placeholder=UPSCALER_PLACEHOLDER_MESSAGE, row=3,
+        custom_id=f'{short_id_generator()}-upscaler-select',
+        options=[
+            discord.SelectOption(label='SwinIR (default, photos and art)',
+                value=UPSCALER_SWINIR),
+            discord.SelectOption(label='RealESRGAN (photos and art)',
+                value=UPSCALER_REALESRGAN_4X),
+            discord.SelectOption(label='RealESRGAN Face-Fixing (photos)',
+                value=UPSCALER_REALESRGAN_4X_FACE),
+            discord.SelectOption(label='RealESRGAN Anime (line art and anime)',
+                value=UPSCALER_REALESRGAN_4X_ANIME),
+            discord.SelectOption(label='Diffusion Upscale (0.1 strength)',
+                value=UPSCALER_STABLE_1),
+            discord.SelectOption(label='Diffusion Upscale (0.2 strength)',
+                value=UPSCALER_STABLE_2),
+            discord.SelectOption(label='Diffusion Upscale (0.3 strength)',
+                value=UPSCALER_STABLE_3),
+            discord.SelectOption(label='Diffusion Upscale (0.4 strength)',
+                value=UPSCALER_STABLE_4),
+            discord.SelectOption(label='Diffusion Upscale (0.5 strength)',
+                value=UPSCALER_STABLE_5),
+            discord.SelectOption(label='No Upscale (gives options to edit image)',
+                value=UPSCALER_NONE),
+        ])
+    async def select_upscaler(self, interaction: discord.Interaction,
+        selection: discord.ui.Select):
+        selected = selection.values
+        if selected[0] is None or selected[0] == 'swinir':
+            self.upscaler = None
+        else:
+            self.upscaler = selected[0]
 
         await interaction.response.defer()

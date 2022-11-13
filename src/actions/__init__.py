@@ -6,6 +6,11 @@ from constants import (
     DISCORD_EMBED_MAX_LENGTH,
     REGEX_FOR_ID,
     UPSCALER_NONE,
+    UPSCALER_STABLE_1,
+    UPSCALER_STABLE_2,
+    UPSCALER_STABLE_3,
+    UPSCALER_STABLE_4,
+    UPSCALER_STABLE_5,
 )
 from serializers import (
     serialize_image_request,
@@ -250,6 +255,7 @@ async def riff(
             'index': idx,
             'iterations': iterations,
             'latentless': bool(latentless),
+            'max_image_size': context.cli_args.max_image_size, # type: ignore
             'outpaint_mode': outpaint_mode,
             'prompt': prompt,
             'prompt_mask': prompt_mask,
@@ -432,6 +438,7 @@ async def upscale(
     docarray_id: str,
     idx: int,
 
+    prompt: Optional[str]=None, # For diffusion upscalers
     upscaler: Optional[str]=None,
 ):
     author_id = str(user.id)
@@ -459,6 +466,8 @@ async def upscale(
         req = {
             'docarray_id': docarray_id,
             'index': idx,
+            'max_image_size': context.cli_args.max_image_size, # type: ignore
+            'prompt': prompt,
             'type': 'upscale',
             'upscaler': upscaler,
         }
@@ -478,9 +487,16 @@ async def upscale(
             context.safety_checker)
 
         view = None
-        if upscaler == UPSCALER_NONE:
+        stable_upscalers = [UPSCALER_STABLE_1, UPSCALER_STABLE_2,
+            UPSCALER_STABLE_3, UPSCALER_STABLE_4, UPSCALER_STABLE_5]
+        if upscaler in [UPSCALER_NONE, *stable_upscalers]:
+            short_id_parent = docarray_id
+            idx_parent = idx
+            if upscaler in stable_upscalers:
+                short_id_parent = output['id']
+                idx_parent = 0
             view = OneImageButtons(context=context, message_id=work_msg.id,
-                short_id_parent=docarray_id, idx_parent=idx)
+                short_id_parent=short_id_parent, idx_parent=idx_parent)
             view.serialize_to_json_and_store(context.button_store_dict) # type: ignore
             context.add_view(view, message_id=work_msg.id)
 

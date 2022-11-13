@@ -13,8 +13,13 @@ from docarray import Document, DocumentArray
 
 
 from constants import (
+    DEFAULT_SD_UPSCALE_SAMPLER,
+    DEFAULT_SD_UPSCALE_SCALE,
+    DEFAULT_SD_UPSCALE_STEPS,
+    DEFAULT_SD_UPSCALE_STRENGTH,
     DOCARRAY_LOCATION_FN,
     IMAGE_LOCATION_FN,
+    IMAGE_LOCATION_FN_JPG,
     IMAGE_STORAGE_FOLDER,
     OutpaintingModes,
     RealESRGANModels,
@@ -23,6 +28,11 @@ from constants import (
     UPSCALER_REALESRGAN_4X,
     UPSCALER_REALESRGAN_4X_ANIME,
     UPSCALER_REALESRGAN_4X_FACE,
+    UPSCALER_STABLE_1,
+    UPSCALER_STABLE_2,
+    UPSCALER_STABLE_3,
+    UPSCALER_STABLE_4,
+    UPSCALER_STABLE_5,
     UPSCALER_SWINIR,
 )
 
@@ -31,9 +41,11 @@ from util import (
     document_to_pil,
     maybe_split_long_prompt_based_on_tokens,
     resize_for_outpainting_modes,
+    resize_image,
     resize_with_mask,
     short_id_generator,
     strip_square,
+    tile_with_upscaler_fn_and_reassemble,
     tweak_docarray_tags,
 )
 
@@ -77,7 +89,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
             da = Document(text=prompt.strip()).post(JINA_SERVER_URL,
                 parameters=params).matches
             short_id = short_id_generator()
-            image_loc = IMAGE_LOCATION_FN(short_id)
+            image_loc = IMAGE_LOCATION_FN_JPG(short_id)
             docarray_loc = DOCARRAY_LOCATION_FN(short_id)
 
             image = document_to_pil(da[0])
@@ -144,7 +156,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
             orig_width, _ = image.size
 
             short_id = short_id_generator()
-            image_loc = IMAGE_LOCATION_FN(short_id)
+            image_loc = IMAGE_LOCATION_FN_JPG(short_id)
             docarray_loc = DOCARRAY_LOCATION_FN(short_id)
             da.plot_image_sprites(output=image_loc, canvas_size=orig_width*2,
                 keep_aspect_ratio=True, show_index=True)
@@ -188,7 +200,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
             orig_width, _ = image.size
 
             short_id = short_id_generator()
-            image_loc = IMAGE_LOCATION_FN(short_id)
+            image_loc = IMAGE_LOCATION_FN_JPG(short_id)
             docarray_loc = DOCARRAY_LOCATION_FN(short_id)
             da.plot_image_sprites(output=image_loc, canvas_size=orig_width*2,
                 keep_aspect_ratio=True, show_index=True)
@@ -206,6 +218,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 iterations = 1
 
             da = None
+            max_image_size = request.get('max_image_size', 768)
             orig_width = None
             orig_height = None
             orig_image = None
@@ -230,7 +243,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 orig_width, orig_height = image.size
                 orig_image = image
                 buffered = BytesIO()
-                img.save(buffered, format='PNG')
+                img.save(buffered, format='PNG', compress_level=1)
                 _d = Document(
                     blob=buffered.getvalue(),
                     mime_type='image/png',
@@ -246,7 +259,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                     request['height'],
                 ), Image.LANCZOS)
                 buffered = BytesIO()
-                resized_image.save(buffered, format='PNG')
+                resized_image.save(buffered, format='PNG', compress_level=1)
                 _d = Document(
                     blob=buffered.getvalue(),
                     mime_type='image/png',
@@ -304,7 +317,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 img_new = resize_with_mask(orig_image,
                     (params['width'], params['height']))
                 buffered = BytesIO()
-                img_new.save(buffered, format='PNG')
+                img_new.save(buffered, format='PNG', compress_level=1)
                 _d = Document(
                     blob=buffered.getvalue(),
                     mime_type='image/png',
@@ -318,13 +331,14 @@ with open(FILE_NAME_IN, 'r') as request_json:
                 request.get('outpaint_mode', None) is not None:
                 # Outpainting modes.
                 img_new = resize_for_outpainting_modes(orig_image,
-                    OutpaintingModes(request['outpaint_mode']))
+                    OutpaintingModes(request['outpaint_mode']),
+                    max_image_size)
                 (width_new, height_new) = img_new.size
                 params_copy = deepcopy(params)
                 params_copy['width'] = width_new
                 params_copy['height'] = height_new
                 buffered = BytesIO()
-                img_new.save(buffered, format='PNG')
+                img_new.save(buffered, format='PNG', compress_level=1)
                 _d = Document(
                     blob=buffered.getvalue(),
                     mime_type='image/png',
@@ -347,7 +361,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
                     parameters=params)[0].matches
 
             short_id = short_id_generator()
-            image_loc = IMAGE_LOCATION_FN(short_id)
+            image_loc = IMAGE_LOCATION_FN_JPG(short_id)
             docarray_loc = DOCARRAY_LOCATION_FN(short_id)
 
             tweak_docarray_tags(diffused_da, 'outpaint_mode',
@@ -406,7 +420,7 @@ with open(FILE_NAME_IN, 'r') as request_json:
             orig_width, _ = image.size
 
             short_id = short_id_generator()
-            image_loc = IMAGE_LOCATION_FN(short_id)
+            image_loc = IMAGE_LOCATION_FN_JPG(short_id)
             docarray_loc = DOCARRAY_LOCATION_FN(short_id)
 
             interpolated_da.plot_image_sprites(output=image_loc, show_index=True,
@@ -430,10 +444,38 @@ with open(FILE_NAME_IN, 'r') as request_json:
             orig_width, _ = image.size
 
             canvas_scale = 4
+            max_image_size = request.get('max_image_size', 768)
+            if max(image.size[0] * canvas_scale, image.size[1] * canvas_scale) > \
+                max_image_size * canvas_scale:
+                raise ValueError('This image is already the maximum size of ' +
+                    f'{max_image_size * canvas_scale} for either height or ' +
+                    'width')
+
             upscale = None
             upscaler = request.get('upscaler', None)
+            doc = da[idx]
+
+            # TODO Investigate why upscaling requires some of the metadata
+            # from the original document in order to work. Simply making the
+            # document/docarray as done above seems to have issues.
+            def img_to_doc_fn(_img: Image) -> Document:
+                copy = deepcopy(doc)
+                _buffered = BytesIO()
+                _img.save(_buffered, format='PNG', compress_level=1)
+                copy.blob = _buffered.getvalue()
+                copy.uri = None
+                copy = copy.convert_blob_to_datauri()
+                return copy
+
             if upscaler is None or upscaler == UPSCALER_SWINIR:
-                upscale = da[idx].post(f'{JINA_SERVER_URL}/upscale')
+                def upscaler_fn(_d: Document) -> Document:
+                    return _d.post(f'{JINA_SERVER_URL}/upscale')
+                upscale = tile_with_upscaler_fn_and_reassemble(
+                    image,
+                    doc,
+                    upscaler_fn,
+                    img_to_doc_fn,
+                )
             if upscaler in [UPSCALER_REALESRGAN_4X,
                 UPSCALER_REALESRGAN_4X_ANIME, UPSCALER_REALESRGAN_4X_FACE]:
                 realesrgan_params = {
@@ -446,23 +488,101 @@ with open(FILE_NAME_IN, 'r') as request_json:
                     realesrgan_params['face_enhance'] = False
                     realesrgan_params['model_name'] = \
                         RealESRGANModels.RealESRGAN_x4plus_anime_6B
-                upscale = DocumentArray([da[idx]]).post(f'{JINA_SERVER_URL}/realesrgan',
-                    parameters=realesrgan_params)[0].matches[0]
+                def upscaler_fn_real(_d: Document) -> Document:
+                    return DocumentArray([_d]).post(
+                        f'{JINA_SERVER_URL}/realesrgan',
+                        parameters=realesrgan_params,
+                    )[0].matches[0]
+                upscale = tile_with_upscaler_fn_and_reassemble(
+                    image,
+                    doc,
+                    upscaler_fn_real,
+                    img_to_doc_fn,
+                )
+
+            # "SD Upscale", resize the image to the maximum size and then
+            # riff at some low strength level. SD was trained at 512x512 so
+            # for large sizes anything >0.3 strength can get pretty weird.
+            if upscaler in [UPSCALER_STABLE_1, UPSCALER_STABLE_2,
+                UPSCALER_STABLE_3, UPSCALER_STABLE_4, UPSCALER_STABLE_5]:
+                # Use SwinIR first.
+                def upscaler_fn(_d: Document) -> Document:
+                    return _d.post(f'{JINA_SERVER_URL}/upscale')
+                upscale = tile_with_upscaler_fn_and_reassemble(
+                    image,
+                    doc,
+                    upscaler_fn,
+                    img_to_doc_fn,
+                )
+                image = document_to_pil(upscale)
+
+                strength = request.get('strength', DEFAULT_SD_UPSCALE_STRENGTH)
+                if upscaler == UPSCALER_STABLE_1:
+                    strength = 0.1
+                if upscaler == UPSCALER_STABLE_3:
+                    strength = 0.3
+                if upscaler == UPSCALER_STABLE_4:
+                    strength = 0.4
+                if upscaler == UPSCALER_STABLE_5:
+                    strength = 0.5
+
+                resized_image = resize_image(image, max_image_size)
+                buffered = BytesIO()
+                resized_image.save(buffered, format='PNG', compress_level=1)
+                _d = Document(
+                    blob=buffered.getvalue(),
+                    mime_type='image/png',
+                ).convert_blob_to_datauri()
+                _d.text = doc.text
+                da = DocumentArray([_d])
+
+                steps = doc.tags.get('steps', DEFAULT_SD_UPSCALE_STEPS)
+                if steps < DEFAULT_SD_UPSCALE_STEPS:
+                    steps = DEFAULT_SD_UPSCALE_STEPS
+
+                params = {
+                    'width': resized_image.size[0],
+                    'height': resized_image.size[1],
+                    'prompt': request.get('prompt', None),
+                    'seed': random.randint(0, 2 ** 32 - 1),
+                    'steps': steps,
+                    'sampler': doc.tags.get('sampler',
+                        DEFAULT_SD_UPSCALE_SAMPLER),
+                    'scale': doc.tags.get('steps', DEFAULT_SD_UPSCALE_SCALE),
+                    'strength': strength,
+                }
+                upscale = da.post(f'{JINA_SERVER_URL}/stablediffuse',
+                    parameters=params)[0].matches[0]
+                canvas_scale = resized_image.size[0] / orig_width
+
             if upscaler == UPSCALER_NONE:
                 canvas_scale = 1
                 upscale = da[idx]
 
             short_id = short_id_generator()
             image_loc = IMAGE_LOCATION_FN(short_id)
-            image_loc_jpeg = f'{IMAGE_STORAGE_FOLDER}/{short_id}.jpg'
+            image_loc_jpeg = IMAGE_LOCATION_FN_JPG(short_id)
 
             da_upscale = DocumentArray([upscale])
-            da_upscale.plot_image_sprites(image_loc,
-                keep_aspect_ratio=True, canvas_size=orig_width * canvas_scale)
+            da_upscale.plot_image_sprites(
+                image_loc,
+                keep_aspect_ratio=True,
+                canvas_size=int(orig_width * canvas_scale),
+            )
             image_png = Image.open(image_loc)
             image_jpg = image_png.save(image_loc_jpeg,
                 quality=95, optimize=True, progressive=True)
-            output['image_loc'] = image_loc_jpeg
+
+            docarray_loc = DOCARRAY_LOCATION_FN(short_id)
+            da_upscale.save_binary(docarray_loc, protocol='protobuf',
+                compress='lz4')
+
+            output['id'] = short_id
+            output['docarray_loc'] = docarray_loc
+            if upscaler != UPSCALER_NONE:
+                output['image_loc'] = image_loc_jpeg
+            else:
+                output['image_loc'] = image_loc
     except Exception as e:
         traceback.print_exc()
         output['error'] = str(e)

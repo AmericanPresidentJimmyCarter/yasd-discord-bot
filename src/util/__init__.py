@@ -7,6 +7,7 @@ import re
 import string
 
 from io import BytesIO
+from itertools import product
 from typing import TYPE_CHECKING, Any, Callable
 from urllib.request import urlopen
 
@@ -14,7 +15,7 @@ import discord
 import numpy as np
 
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
-from docarray import DocumentArray
+from docarray import Document, DocumentArray
 from transformers import CLIPTokenizer
 
 if TYPE_CHECKING:
@@ -25,13 +26,14 @@ if TYPE_CHECKING:
 from constants import (
     CLIP_TOKENIZER_MERGES_FN,
     CLIP_TOKENIZER_VOCAB_FN,
+    DEFAULT_IMAGE_HEIGHT_WIDTH,
     DOCARRAY_LOCATION_FN,
     ID_LENGTH,
     IMAGETOOL_MODULE_NAME,
     JSON_IMAGE_TOOL_INPUT_FILE_FN,
     JSON_IMAGE_TOOL_OUTPUT_FILE_FN,
-    MAX_IMAGE_HEIGHT_WIDTH,
     MAX_MODEL_CLIP_TOKENS_PER_PROMPT,
+    MAX_UPSCALE_SIZE,
     MIN_IMAGE_HEIGHT_WIDTH,
     OutpaintingModes,
     REGEX_FOR_TAGS,
@@ -128,7 +130,7 @@ async def check_restricted_to_channel(
     return True
 
 
-async def check_subprompt_token_length(
+def check_subprompt_token_length(
     prompt: str,
 ):
     if prompt is None or prompt == '':
@@ -192,6 +194,15 @@ def complete_request(
 def document_to_pil(doc):
     uri_data = urlopen(doc.uri)
     return Image.open(BytesIO(uri_data.read()))
+
+
+def image_grid(imgs: list[Image], rows: int, cols:int) -> Image:
+    width, height = imgs[0].size
+    grid = Image.new('RGB', size=(cols * width, rows * height))
+
+    for i, img in enumerate(imgs):
+        grid.paste(img, box=(i % cols * width, i // cols * height))
+    return grid
 
 
 def img_to_tensor(img: Image) -> 'Tensor':
@@ -338,23 +349,28 @@ def prompt_has_valid_sd_custom_embeddings(prompt: str|None):
         VALID_TAG_CONCEPTS[concept] = True
 
 
-def resize_image(img: Image) -> Image:
-    w, h = img.size
-    ratio = float(w) / float(h)
+def resize_image(img: Image, max_size: int) -> Image:
+    w_orig, h_orig = img.size
+    ratio = float(w_orig) / float(h_orig)
     
-    w = MAX_IMAGE_HEIGHT_WIDTH
-    h = MAX_IMAGE_HEIGHT_WIDTH
+    w = max_size
+    h = max_size
     if ratio > 1:
-        w = MAX_IMAGE_HEIGHT_WIDTH
-        h = int(float(MAX_IMAGE_HEIGHT_WIDTH) / ratio)
+        w = max_size
+        h = int(float(max_size) / ratio)
         if h < MIN_IMAGE_HEIGHT_WIDTH:
             h = MIN_IMAGE_HEIGHT_WIDTH
     if ratio < 1:
-        w = int(float(MAX_IMAGE_HEIGHT_WIDTH) * ratio)
+        w = int(float(max_size) * ratio)
         if w < MIN_IMAGE_HEIGHT_WIDTH:
             w = MIN_IMAGE_HEIGHT_WIDTH
-        h = MAX_IMAGE_HEIGHT_WIDTH
-    w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+        h = max_size
+    if w == MIN_IMAGE_HEIGHT_WIDTH:
+        h = min(max_size, int(h_orig * (w / w_orig)))
+    if h == MIN_IMAGE_HEIGHT_WIDTH:
+        w = min(max_size, int(w_orig * (h / h_orig)))
+
+    w, h = map(lambda x: x - x % 16, (w, h))  # resize to integer multiple of 16
 
     # If the image is RGBA and the mask layer is empty, remove it.
     if img.mode == 'RGBA' and img.split()[-1].getextrema() == (255, 255):
@@ -366,7 +382,11 @@ def resize_image(img: Image) -> Image:
     return preserve_transparency_resize(img, (w, h))
 
 
-def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
+def resize_for_outpainting_modes(
+    img: Image,
+    mode: OutpaintingModes,
+    max_size: int,
+) -> Image:
     '''
     Resize an image an add a mask for outpainting.
 
@@ -377,6 +397,8 @@ def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
     OUTPAINT_25_DOWN = 'outpaint_25_d'
     '''
     w, h = img.size
+
+    intended_expansion_size_max = DEFAULT_IMAGE_HEIGHT_WIDTH
 
     image_expanded_and_masked = None
     if mode == OutpaintingModes.OUTPAINT_25_ALL:
@@ -415,6 +437,7 @@ def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
         together = Image.composite(image_expanded, noised, mask)
         together.putalpha(mask)
         image_expanded_and_masked = together
+        intended_expansion_size_max = max(int(w * 1.25), int(h * 1.25))
 
     if mode in [
         OutpaintingModes.OUTPAINT_25_LEFT,
@@ -431,8 +454,8 @@ def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
             OutpaintingModes.OUTPAINT_25_DOWN]:
             canvas_height = int(math.floor(h * 1.25))
 
-        coords_paste = None
-        coords_mask = None
+        coords_paste = (0, 0, 0, 0)
+        coords_mask = (0, 0, 0, 0)
         if mode == OutpaintingModes.OUTPAINT_25_LEFT:
             coords_paste = (
                 canvas_width - w,
@@ -446,6 +469,7 @@ def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
                 canvas_width - 1,
                 canvas_height - 1,
             )
+            intended_expansion_size_max = int(w * 1.25)
         if mode == OutpaintingModes.OUTPAINT_25_RIGHT:
             coords_paste = (
                 0,
@@ -459,6 +483,7 @@ def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
                 w - 1,
                 canvas_height - 1,
             )
+            intended_expansion_size_max = int(w * 1.25)
         if mode == OutpaintingModes.OUTPAINT_25_UP:
             coords_paste = (
                 0,
@@ -472,6 +497,7 @@ def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
                 canvas_width - 1,
                 canvas_height - 1,
             )
+            intended_expansion_size_max = int(h * 1.25)
         if mode == OutpaintingModes.OUTPAINT_25_DOWN:
             coords_paste = (
                 0,
@@ -485,6 +511,11 @@ def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
                 canvas_width - 1,
                 h - 1,
             )
+            intended_expansion_size_max = int(h * 1.25)
+
+        # Limit outpainting expansion based on the user-declared maximum size.
+        if intended_expansion_size_max > max_size:
+            intended_expansion_size_max = max_size
 
         image_expanded = Image.new(img.mode, (canvas_width, canvas_height))
         image_expanded.paste(img, coords_paste)
@@ -506,7 +537,7 @@ def resize_for_outpainting_modes(img: Image, mode: OutpaintingModes) -> Image:
         together.putalpha(mask)
         image_expanded_and_masked = together
 
-    return resize_image(image_expanded_and_masked)
+    return resize_image(image_expanded_and_masked, intended_expansion_size_max)
 
 
 def resize_with_mask(img: Image, expected_size: tuple[int, int]) -> Image:
@@ -702,6 +733,44 @@ def strip_square(s: str) -> str:
             ret += i
     return ret
 
+
+def tile_image(img: Image, tile_width: int, tile_height: int) -> list[Image]:
+    w, h = img.size
+    grid = product(
+        range(0, h - h % tile_height, tile_height),
+        range(0, w - w % tile_width, tile_width),
+    )
+    out = []
+    for i, j in grid:
+        box = (j, i, j + tile_width, i + tile_height)
+        out.append(img.crop(box))
+
+    return out
+
+
+def tile_with_upscaler_fn_and_reassemble(
+    img: Image,
+    doc: Document,
+    upscaler_fn: Callable,
+    img_to_doc_fn: Callable,
+) -> Document:
+    (width, height) = img.size
+    if width <= MAX_UPSCALE_SIZE and height <= MAX_UPSCALE_SIZE:
+        return upscaler_fn(doc)
+
+    # TODO Support really big images by scaling the divisor and doing more
+    # upscales?
+    tiles = tile_image(img, int(width / 2), int(height / 2))
+    upscaled_tiles = []
+    for tile in tiles:
+        _d = img_to_doc_fn(tile)
+        _d_u = upscaler_fn(_d)
+        tile_upscaled = document_to_pil(_d_u)
+        upscaled_tiles.append(tile_upscaled)
+
+    assembled = image_grid(upscaled_tiles, 2, 2)
+
+    return img_to_doc_fn(assembled)
 
 
 def tweak_docarray_tags(doc_arr: DocumentArray, key: str, val: Any):

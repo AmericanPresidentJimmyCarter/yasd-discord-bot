@@ -26,6 +26,7 @@ JSON_IMAGE_TOOL_OUTPUT_FILE_FN = lambda uid, nonce: f'../temp_json/output-{uid}_
 DISCORD_EMBED_MAX_LENGTH = 1024
 IMAGE_LOCATION_FN = lambda sid: f'../images/{sid}.png'
 
+DEFAULT_IMAGE_HEIGHT_WIDTH = 512
 MIN_ITERATIONS = 1
 MAX_ITERATIONS = 16
 MIN_SCALE = 1.0
@@ -36,16 +37,8 @@ MAX_STEPS = 250
 MIN_STRENGTH = 0.01
 MIN_STRENGTH_INTERPOLATE = 0.50
 MAX_STRENGTH = 0.99
+MAX_UPSCALE_SIZE = 768
 NUM_IMAGES_MAX = 9
-
-VALID_IMAGE_HEIGHT_WIDTH = { 384, 416, 448, 480, 512, 544, 576, 608, 640, 672,
-    704, 736, 768 }
-
-UPSCALER_SWINIR = 'swinir'
-UPSCALER_REALESRGAN_4X = 'resrgan_4x'
-UPSCALER_REALESRGAN_4X_FACE = 'resrgan_4x_face'
-UPSCALER_REALESRGAN_4X_ANIME = 'resrgan_4x_anime'
-UPSCALER_NONE = 'no_upscale'
 
 
 CLIP_TOKENIZER_MERGES_FN = '../clip_vit_large_patch14/merges.txt'
@@ -53,12 +46,29 @@ CLIP_TOKENIZER_VOCAB_FN = '../clip_vit_large_patch14/vocab.json'
 DOCARRAY_LOCATION_FN = lambda docarray_id: f'../image_docarrays/{docarray_id}.bin'
 ID_LENGTH = 12
 IMAGE_LOCATION_FN = lambda sid: f'../images/{sid}.png'
-MAX_IMAGE_HEIGHT_WIDTH = 768
+IMAGE_LOCATION_FN_JPG = lambda sid: f'../images/{sid}.jpg'
 MAX_MODEL_CLIP_TOKENS_PER_PROMPT = 77
 MIN_IMAGE_HEIGHT_WIDTH = 384
 REGEX_FOR_TAGS = re.compile('<.*?>')
 SD_CONCEPTS_URL_FN = lambda concept: f'https://huggingface.co/sd-concepts-library/{concept}/resolve/main/'
 VALID_TAG_CONCEPTS: dict[str, Any] = {}
+
+
+UPSCALER_SWINIR = 'swinir'
+UPSCALER_REALESRGAN_4X = 'resrgan_4x'
+UPSCALER_REALESRGAN_4X_FACE = 'resrgan_4x_face'
+UPSCALER_REALESRGAN_4X_ANIME = 'resrgan_4x_anime'
+UPSCALER_STABLE_1 = 'sd_based_upscaler_1'
+UPSCALER_STABLE_2 = 'sd_based_upscaler_2'
+UPSCALER_STABLE_3 = 'sd_based_upscaler_3'
+UPSCALER_STABLE_4 = 'sd_based_upscaler_4'
+UPSCALER_STABLE_5 = 'sd_based_upscaler_5'
+UPSCALER_NONE = 'no_upscale'
+
+DEFAULT_SD_UPSCALE_SAMPLER = 'dpmpp_2m'
+DEFAULT_SD_UPSCALE_SCALE = 7.5
+DEFAULT_SD_UPSCALE_STEPS = 35
+DEFAULT_SD_UPSCALE_STRENGTH = 0.2
 
 
 class RealESRGANModels(str, enum.Enum):
@@ -76,30 +86,6 @@ class OutpaintingModes(str, enum.Enum):
     OUTPAINT_25_RIGHT = 'outpaint_25_r'
     OUTPAINT_25_UP = 'outpaint_25_u'
     OUTPAINT_25_DOWN = 'outpaint_25_d'
-
-
-UPSCALER_SWINIR = 'swinir'
-UPSCALER_REALESRGAN_4X = 'resrgan_4x'
-UPSCALER_REALESRGAN_4X_FACE = 'resrgan_4x_face'
-UPSCALER_REALESRGAN_4X_ANIME = 'resrgan_4x_anime'
-UPSCALER_NONE = 'no_upscale'
-
-
-HEIGHT_AND_WIDTH_CHOICES = [
-    app_commands.Choice(name="512 (Default)", value=512),
-    app_commands.Choice(name="384", value=384),
-    app_commands.Choice(name="416", value=416),
-    app_commands.Choice(name="448", value=448),
-    app_commands.Choice(name="480", value=480),
-    app_commands.Choice(name="544", value=544),
-    app_commands.Choice(name="576", value=576),
-    app_commands.Choice(name="608", value=608),
-    app_commands.Choice(name="640", value=640),
-    app_commands.Choice(name="672", value=672),
-    app_commands.Choice(name="704", value=704),
-    app_commands.Choice(name="736", value=736),
-    app_commands.Choice(name="768", value=768),
-]
 
 
 OUTPAINT_CHOICES = [
@@ -142,6 +128,16 @@ UPSCALER_CHOICES = [
         value=UPSCALER_REALESRGAN_4X_FACE),
     app_commands.Choice(name="RealESRGAN Anime (line art and anime)",
         value=UPSCALER_REALESRGAN_4X_ANIME),
+    app_commands.Choice(name="Diffusion Upscale (0.1 strength)",
+        value=UPSCALER_STABLE_1),
+    app_commands.Choice(name="Diffusion Upscale (0.2 strength)",
+        value=UPSCALER_STABLE_2),
+    app_commands.Choice(name="Diffusion Upscale (0.3 strength)",
+        value=UPSCALER_STABLE_3),
+    app_commands.Choice(name="Diffusion Upscale (0.4 strength)",
+        value=UPSCALER_STABLE_4),
+    app_commands.Choice(name="Diffusion Upscale (0.5 strength)",
+        value=UPSCALER_STABLE_5),
     app_commands.Choice(name="No Upscale (return original image)",
         value=UPSCALER_NONE),
 ]
