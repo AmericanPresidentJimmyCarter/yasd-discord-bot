@@ -3,9 +3,12 @@ from typing import TYPE_CHECKING, Optional
 import discord
 
 from PIL import Image
+from async_timeout import timeout
 
 from constants import (
+    DEFAULT_ACTION_TIMEOUT_SECONDS,
     DISCORD_EMBED_MAX_LENGTH,
+    DISCORD_MESSAGE_MAX_LENGTH,
     REGEX_FOR_ID,
     UPSCALER_NONE,
     UPSCALER_STABLE_1,
@@ -136,61 +139,71 @@ async def image(
         }
         nonce = bump_nonce_and_return(context.user_image_generation_nonces, # type: ignore
             author_id)
-        output = await spawn_image_tool_instance(author_id, nonce, req)
+        
+        async with timeout(DEFAULT_ACTION_TIMEOUT_SECONDS):
+            output = await spawn_image_tool_instance(author_id, nonce, req)
 
-        err = output.get('error', None)
-        if err is not None:
-            raise Exception(err)
-        image_loc = output['image_loc']
-        short_id = output['id']
-        tweak_docarray_tags_request(short_id, {
-            'user_id': user.id,
-        })
-        seeds = output.get('seeds', None)
+            err = output.get('error', None)
+            if err is not None:
+                raise Exception(err)
+            image_loc = output['image_loc']
+            short_id = output['id']
+            tweak_docarray_tags_request(short_id, {
+                'user_id': user.id,
+            })
+            seeds = output.get('seeds', None)
 
-        file = to_discord_file_and_maybe_check_safety(
-            context.cli_args.auto_spoiler, # type: ignore
-            image_loc,
-            context.safety_feature_extractor,
-            context.safety_checker)
-        if seed_search is True:
-            seed_lst = []
-            for i, _s in enumerate(seeds):
-                seed_lst.append(f'{i}: {_s}')
-            seeds_str = ', '.join(seed_lst)
+            file = to_discord_file_and_maybe_check_safety(
+                context.cli_args.auto_spoiler, # type: ignore
+                image_loc,
+                context.safety_feature_extractor,
+                context.safety_checker)
+            if seed_search is True:
+                seed_lst = []
+                for i, _s in enumerate(seeds):
+                    seed_lst.append(f'{i}: {_s}')
+                seeds_str = ', '.join(seed_lst)
 
-            work_msg = await work_msg.edit(
-                content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`. Seeds used were {seeds_str}',
-                attachments=[file])
-        elif typ == 'promptarray':
-            work_msg = await work_msg.edit(
-                content=f'Image generation for prompt array "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
-                attachments=[file])
-        else:
-            btns = FourImageButtons(context=context, message_id=work_msg.id,
-                short_id=short_id)
-            btns.serialize_to_json_and_store(context.button_store_dict) # type: ignore
-            context.add_view(btns, message_id=work_msg.id)
-            work_msg = await work_msg.edit(
-                content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
-                attachments=[file],
-                view=btns)
+                work_msg = await work_msg.edit(
+                    content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`. Seeds used were {seeds_str}',
+                    attachments=[file])
+            elif typ == 'promptarray':
+                work_msg = await work_msg.edit(
+                    content=f'Image generation for prompt array "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
+                    attachments=[file])
+            else:
+                btns = FourImageButtons(context=context, message_id=work_msg.id,
+                    short_id=short_id)
+                btns.serialize_to_json_and_store(context.button_store_dict) # type: ignore
+                context.add_view(btns, message_id=work_msg.id)
+                work_msg = await work_msg.edit(
+                    content=f'Image generation for prompt "{prompt}" by <@{author_id}> complete. The ID for your images is `{short_id}`.',
+                    attachments=[file],
+                    view=btns)
 
-        serialized_cmd = serialize_image_request(
-            prompt=prompt,
-            height=height,
-            sampler=sampler,
-            scale=scale,
-            seed=seed_from_docarray_id(short_id),
-            seed_search=seed_search,
-            steps=steps,
-            width=width)
-        await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
+            serialized_cmd = serialize_image_request(
+                prompt=prompt,
+                height=height,
+                sampler=sampler,
+                scale=scale,
+                seed=seed_from_docarray_id(short_id),
+                seed_search=seed_search,
+                steps=steps,
+                width=width)
+            await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        await channel.send(f'Got unknown error on prompt "{prompt}": {str(e)}')
+        await channel.send(f'Got unknown error on prompt "{prompt}" type {type(e).__name__}!')
+        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH - 100:]
+        if len(e_string_trun) > 0:
+            await channel.send(
+                f'''
+                ```
+                {e_string_trun}
+                ```
+                ''')
     finally:
         complete_request(context, author_id, queue_message)
 
@@ -272,57 +285,67 @@ async def riff(
         }
         nonce = bump_nonce_and_return(context.user_image_generation_nonces, # type: ignore
             author_id)
-        output = await spawn_image_tool_instance(author_id, nonce, req)
 
-        err = output.get('error', None)
-        if err is not None:
-            raise Exception(err)
-        image_loc = output['image_loc']
-        short_id = output['id']
-        tweak_docarray_tags_request(short_id, {
-            'original_image': docarray_id,
-            'user_id': user.id,
-        })
+        async with timeout(DEFAULT_ACTION_TIMEOUT_SECONDS):
+            output = await spawn_image_tool_instance(author_id, nonce, req)
 
-        file = to_discord_file_and_maybe_check_safety(
-            context.cli_args.auto_spoiler, # type: ignore
-            image_loc,
-            context.safety_feature_extractor,
-            context.safety_checker)
-        btns = FourImageButtons(context=context, message_id=work_msg.id,
-            idx_parent=idx, short_id=short_id, short_id_parent=docarray_id)
-        btns.serialize_to_json_and_store(context.button_store_dict) # type: ignore
-        context.add_view(btns, message_id=work_msg.id)
-        work_msg = await work_msg.edit(
-            content=f'Image generation for riff on `{docarray_id}` index {str(idx)} for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
-            attachments=[file],
-            view=btns)
+            err = output.get('error', None)
+            if err is not None:
+                raise Exception(err)
+            image_loc = output['image_loc']
+            short_id = output['id']
+            tweak_docarray_tags_request(short_id, {
+                'original_image': docarray_id,
+                'user_id': user.id,
+            })
 
-        final_width, final_height = Image.open(image_loc).size
-        final_width = final_width // 2
-        final_height = final_height // 2
+            file = to_discord_file_and_maybe_check_safety(
+                context.cli_args.auto_spoiler, # type: ignore
+                image_loc,
+                context.safety_feature_extractor,
+                context.safety_checker)
+            btns = FourImageButtons(context=context, message_id=work_msg.id,
+                idx_parent=idx, short_id=short_id, short_id_parent=docarray_id)
+            btns.serialize_to_json_and_store(context.button_store_dict) # type: ignore
+            context.add_view(btns, message_id=work_msg.id)
+            work_msg = await work_msg.edit(
+                content=f'Image generation for riff on `{docarray_id}` index {str(idx)} for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
+                attachments=[file],
+                view=btns)
 
-        serialized_cmd = serialize_riff_request(
-            docarray_id=docarray_id,
-            idx=idx,
-            height=final_height,
-            iterations=iterations,
-            latentless=bool(latentless),
-            outpaint_mode=outpaint_mode,
-            prompt=prompt,
-            prompt_mask=prompt_mask,
-            resize=bool(resize),
-            sampler=sampler,
-            scale=scale,
-            seed=seed_from_docarray_id(short_id),
-            steps=steps,
-            strength=strength,
-            width=final_width)
-        await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
+            final_width, final_height = Image.open(image_loc).size
+            final_width = final_width // 2
+            final_height = final_height // 2
+
+            serialized_cmd = serialize_riff_request(
+                docarray_id=docarray_id,
+                idx=idx,
+                height=final_height,
+                iterations=iterations,
+                latentless=bool(latentless),
+                outpaint_mode=outpaint_mode,
+                prompt=prompt,
+                prompt_mask=prompt_mask,
+                resize=bool(resize),
+                sampler=sampler,
+                scale=scale,
+                seed=seed_from_docarray_id(short_id),
+                steps=steps,
+                strength=strength,
+                width=final_width)
+            await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
     except Exception as e:
         import traceback
         traceback.print_exc()
-        await channel.send(f'Got unknown error on riff "{docarray_id}" index {str(idx)}: {str(e)}')
+        await channel.send(f'Got unknown error on riff "{docarray_id}" index {str(idx)} type {type(e).__name__}!')
+        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH - 100:]
+        if len(e_string_trun) > 0:
+            await channel.send(
+                f'''
+                ```
+                {e_string_trun}
+                ```
+                ''')
     finally:
         complete_request(context, author_id, queue_message)
 
@@ -394,42 +417,52 @@ async def interpolate(
         }
         nonce = bump_nonce_and_return(context.user_image_generation_nonces, # type: ignore
             author_id)
-        output = await spawn_image_tool_instance(author_id, nonce, req)
 
-        err = output.get('error', None)
-        if err is not None:
-            raise Exception(err)
-        image_loc = output['image_loc']
-        short_id = output['id']
-        tweak_docarray_tags_request(short_id, {
-            'user_id': user.id,
-        })
+        async with timeout(DEFAULT_ACTION_TIMEOUT_SECONDS):
+            output = await spawn_image_tool_instance(author_id, nonce, req)
 
-        file = to_discord_file_and_maybe_check_safety(
-            context.cli_args.auto_spoiler, # type: ignore
-            image_loc,
-            context.safety_feature_extractor,
-            context.safety_checker)
-        work_msg = await work_msg.edit(
-            content=f'Image generation for interpolate on `{prompt1}` to `{prompt2}` for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
-            attachments=[file])
+            err = output.get('error', None)
+            if err is not None:
+                raise Exception(err)
+            image_loc = output['image_loc']
+            short_id = output['id']
+            tweak_docarray_tags_request(short_id, {
+                'user_id': user.id,
+            })
 
-        serialized_cmd = serialize_interpolate_request(
-            prompt1=prompt1,
-            prompt2=prompt2,
-            height=height,
-            resample_prior=resample_prior,
-            sampler=sampler,
-            scale=scale,
-            seed=seed_from_docarray_id(short_id),
-            steps=steps,
-            strength=strength,
-            width=width)
-        await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
+            file = to_discord_file_and_maybe_check_safety(
+                context.cli_args.auto_spoiler, # type: ignore
+                image_loc,
+                context.safety_feature_extractor,
+                context.safety_checker)
+            work_msg = await work_msg.edit(
+                content=f'Image generation for interpolate on `{prompt1}` to `{prompt2}` for <@{author_id}> complete. The ID for your new images is `{short_id}`.',
+                attachments=[file])
+
+            serialized_cmd = serialize_interpolate_request(
+                prompt1=prompt1,
+                prompt2=prompt2,
+                height=height,
+                resample_prior=resample_prior,
+                sampler=sampler,
+                scale=scale,
+                seed=seed_from_docarray_id(short_id),
+                steps=steps,
+                strength=strength,
+                width=width)
+            await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
     except Exception as e:
         import traceback
         traceback.print_exc()
-        await channel.send(f'Got unknown error on interpolate `{prompt1}` to `{prompt2}`: {str(e)}')
+        await channel.send(f'Got unknown error on interpolate `{prompt1}` to `{prompt2}` type {type(e).__name__}!')
+        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH - 100:]
+        if len(e_string_trun) > 0:
+            await channel.send(
+                f'''
+                ```
+                {e_string_trun}
+                ```
+                ''')
     finally:
         complete_request(context, author_id, queue_message)
 
@@ -479,46 +512,56 @@ async def upscale(
         }
         nonce = bump_nonce_and_return(context.user_image_generation_nonces, # type: ignore
             author_id)
-        output = await spawn_image_tool_instance(author_id, nonce, req)
 
-        err = output.get('error', None)
-        if err is not None:
-            raise Exception(err)
-        image_loc = output['image_loc']
+        async with timeout(DEFAULT_ACTION_TIMEOUT_SECONDS):
+            output = await spawn_image_tool_instance(author_id, nonce, req)
 
-        file = to_discord_file_and_maybe_check_safety(
-            context.cli_args.auto_spoiler, # type: ignore
-            image_loc,
-            context.safety_feature_extractor,
-            context.safety_checker)
+            err = output.get('error', None)
+            if err is not None:
+                raise Exception(err)
+            image_loc = output['image_loc']
 
-        view = None
-        stable_upscalers = [UPSCALER_STABLE_1, UPSCALER_STABLE_2,
-            UPSCALER_STABLE_3, UPSCALER_STABLE_4, UPSCALER_STABLE_5]
-        if upscaler in [UPSCALER_NONE, *stable_upscalers]:
-            short_id_parent = docarray_id
-            idx_parent = idx
-            if upscaler in stable_upscalers:
-                short_id_parent = output['id']
-                idx_parent = 0
-            view = OneImageButtons(context=context, message_id=work_msg.id,
-                short_id_parent=short_id_parent, idx_parent=idx_parent)
-            view.serialize_to_json_and_store(context.button_store_dict) # type: ignore
-            context.add_view(view, message_id=work_msg.id)
+            file = to_discord_file_and_maybe_check_safety(
+                context.cli_args.auto_spoiler, # type: ignore
+                image_loc,
+                context.safety_feature_extractor,
+                context.safety_checker)
 
-        work_msg = await work_msg.edit(
-            content=f'Image generation for upscale on `{docarray_id}` index {str(idx)} for <@{author_id}> complete.',
-            attachments=[file],
-            view=view)
+            view = None
+            stable_upscalers = [UPSCALER_STABLE_1, UPSCALER_STABLE_2,
+                UPSCALER_STABLE_3, UPSCALER_STABLE_4, UPSCALER_STABLE_5]
+            if upscaler in [UPSCALER_NONE, *stable_upscalers]:
+                short_id_parent = docarray_id
+                idx_parent = idx
+                if upscaler in stable_upscalers:
+                    short_id_parent = output['id']
+                    idx_parent = 0
+                view = OneImageButtons(context=context, message_id=work_msg.id,
+                    short_id_parent=short_id_parent, idx_parent=idx_parent)
+                view.serialize_to_json_and_store(context.button_store_dict) # type: ignore
+                context.add_view(view, message_id=work_msg.id)
 
-        serialized_cmd = serialize_upscale_request(docarray_id=docarray_id,
-            idx=idx, upscaler=upscaler)
-        await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
-        completed = True
+            work_msg = await work_msg.edit(
+                content=f'Image generation for upscale on `{docarray_id}` index {str(idx)} for <@{author_id}> complete.',
+                attachments=[file],
+                view=view)
+
+            serialized_cmd = serialize_upscale_request(docarray_id=docarray_id,
+                idx=idx, upscaler=upscaler)
+            await send_alert_embed(channel, author_id, work_msg, serialized_cmd)
+            completed = True
     except Exception as e:
         import traceback
         traceback.print_exc()
-        await channel.send(f'Got unknown error on upscale "{docarray_id}" index {str(idx)}: {str(e)}')
+        await channel.send(f'Got unknown error on upscale "{docarray_id}" index {str(idx)} type {type(e).__name__}!')
+        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH - 100:]
+        if len(e_string_trun) > 0:
+            await channel.send(
+                f'''
+                ```
+                {e_string_trun}
+                ```
+                ''')
     finally:
         complete_request(context, author_id, queue_message)
 

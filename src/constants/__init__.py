@@ -23,9 +23,12 @@ BUTTON_STORE_ONE_IMAGE_BUTTONS_KEY = 'one_img_views'
 JSON_IMAGE_TOOL_INPUT_FILE_FN = lambda uid, nonce: f'../temp_json/request-{uid}_{nonce}.json'
 JSON_IMAGE_TOOL_OUTPUT_FILE_FN = lambda uid, nonce: f'../temp_json/output-{uid}_{nonce}.json'
 
+DISCORD_MESSAGE_MAX_LENGTH = 2000
 DISCORD_EMBED_MAX_LENGTH = 1024
+
 IMAGE_LOCATION_FN = lambda sid: f'../images/{sid}.png'
 
+DEFAULT_ACTION_TIMEOUT_SECONDS = 60 * 15
 DEFAULT_IMAGE_HEIGHT_WIDTH = 512
 MIN_ITERATIONS = 1
 MAX_ITERATIONS = 16
@@ -44,7 +47,6 @@ NUM_IMAGES_MAX = 9
 CLIP_TOKENIZER_MERGES_FN = '../clip_vit_large_patch14/merges.txt'
 CLIP_TOKENIZER_VOCAB_FN = '../clip_vit_large_patch14/vocab.json'
 DOCARRAY_LOCATION_FN = lambda docarray_id: f'../image_docarrays/{docarray_id}.bin'
-ID_LENGTH = 12
 IMAGE_LOCATION_FN = lambda sid: f'../images/{sid}.png'
 IMAGE_LOCATION_FN_JPG = lambda sid: f'../images/{sid}.jpg'
 MAX_MODEL_CLIP_TOKENS_PER_PROMPT = 77
