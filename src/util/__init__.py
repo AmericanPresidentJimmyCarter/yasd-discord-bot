@@ -350,6 +350,9 @@ def prompt_has_valid_sd_custom_embeddings(prompt: str|None):
 
 
 def resize_image(img: Image, max_size: int) -> Image:
+    if img.mode == 'P':
+        img = img.convert('RGBA')
+
     w_orig, h_orig = img.size
     ratio = float(w_orig) / float(h_orig)
     

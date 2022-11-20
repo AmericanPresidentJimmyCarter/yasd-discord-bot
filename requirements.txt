@@ -8,3 +8,4 @@ numpy
 transformers
 ftfy
 tqdm
+async-timeout

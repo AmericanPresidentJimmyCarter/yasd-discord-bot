@@ -196,7 +196,7 @@ async def image(
         import traceback
         traceback.print_exc()
         await channel.send(f'Got unknown error on prompt "{prompt}" type {type(e).__name__}!')
-        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH - 100:]
+        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH + 100:]
         if len(e_string_trun) > 0:
             await channel.send(
                 f'''
@@ -338,7 +338,7 @@ async def riff(
         import traceback
         traceback.print_exc()
         await channel.send(f'Got unknown error on riff "{docarray_id}" index {str(idx)} type {type(e).__name__}!')
-        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH - 100:]
+        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH + 100:]
         if len(e_string_trun) > 0:
             await channel.send(
                 f'''
@@ -455,7 +455,7 @@ async def interpolate(
         import traceback
         traceback.print_exc()
         await channel.send(f'Got unknown error on interpolate `{prompt1}` to `{prompt2}` type {type(e).__name__}!')
-        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH - 100:]
+        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH + 100:]
         if len(e_string_trun) > 0:
             await channel.send(
                 f'''
@@ -554,7 +554,7 @@ async def upscale(
         import traceback
         traceback.print_exc()
         await channel.send(f'Got unknown error on upscale "{docarray_id}" index {str(idx)} type {type(e).__name__}!')
-        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH - 100:]
+        e_string_trun = str(e)[-DISCORD_MESSAGE_MAX_LENGTH + 100:]
         if len(e_string_trun) > 0:
             await channel.send(
                 f'''

@@ -11,3 +11,4 @@ transformers
 detoxify
 ftfy
 tqdm
+async-timeout
